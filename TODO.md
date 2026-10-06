@@ -149,5 +149,47 @@ Findings from the architecture review of `docs/ARCHITECTURE.md` against `src/`. 
   - Section 4: dependency graph is missing `Floaty`/`FloatyAnchor`/`useRectTracker` -> `utils`.
   - Section 6.2: note that window `resize` reports `scroll` (snaps), while the anchor's
     `ResizeObserver` usually reports `layout` in the same frame.
-- [ ] **Playwright suite against `demo/`** to cover real scrolling, layout shifts and
-  multi-commit anchor swaps that jsdom cannot reproduce.
+
+## Test coverage
+
+Current suite: 49 tests in jsdom with faked layout (`data-rect`), a recording
+`element.animate` mock and a no-op `ResizeObserver`. It proves what we compute and request,
+not what renders. Update section 15 of `docs/ARCHITECTURE.md` as these land.
+
+### jsdom gaps (cheap, do first)
+
+- [ ] **`useRectTracker`** (`src/useRectTracker.ts`): scroll (capture phase, nested
+  containers), window resize and `ResizeObserver` triggers; one measurement per animation
+  frame; `layout` wins over `scroll` in the same frame; listeners only while active and
+  removed on deactivate/unmount. Needs a controllable `ResizeObserver` fake and a manual
+  `requestAnimationFrame` in `tests/setup.ts`.
+- [ ] **rAF fallback** (`playWithFrames` in `src/animate.ts`): with `element.animate`
+  removed, inner Δ styles are written each frame, resting styles are restored on finish
+  and on cancel, and `onFinish` is not called after cancel.
+- [ ] **Anchor switch mid-flight at component level**: easing restarts from the current
+  gap; spring keyframes start from the current gap and continue with the carried velocity;
+  `onTransitionStart` does not fire again.
+- [ ] **Interruptions that end a transition**:
+  - anchor disappears mid-flight: motion cancelled, hidden, `isAnimating` false;
+  - snap mid-flight (`transition={false}` or reduced motion on the next retarget):
+    `onTransitionEnd` fires once;
+  - `Floaty` unmounts mid-flight: animation cancelled, `isAnimating` cleared.
+- [ ] **StrictMode and multiple `Floaty`s**: double effect invocation keeps the layer and
+  anchor stack correct; layer is ref-counted across several `Floaty`s.
+- [ ] **`bounceSize` with its own spring at component level**: size keyframes follow the
+  given spring (can overshoot) while position uses the main one.
+- [ ] **`useFloaty().remeasure()`** triggers a `layout` measurement.
+
+### Real browser (Playwright against `demo/`)
+
+- [ ] Set up Playwright (`pnpm add -D @playwright/test`), a `pnpm test:e2e` script, and a
+  config that starts `pnpm dev`.
+- [ ] `calc(100% ± Δ)` and sampled spring keyframes render as intended (inner box matches
+  the anchor at rest and lands exactly at the end).
+- [ ] Scroll at rest: the floaty stays aligned with its anchor (page scroll, nested scroll
+  container, sticky sidebar anchors in the demo).
+- [ ] Scroll mid-transition: no restart, lands on the moved anchor.
+- [ ] Layout shift detection with real `ResizeObserver` and window resize.
+- [ ] Multi-commit anchor swap (lazy/Suspense anchor) to reproduce the same-commit issue
+  before fixing it.
+- [ ] Optional: frame-timing or screenshot checks for scroll lag and jitter.
