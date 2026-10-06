@@ -1,10 +1,18 @@
 import { useMemo, useRef, type CSSProperties, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useStore } from 'zustand';
-import { animateRect, applyRect, prefersReducedMotion, type RectAnimation } from './animate';
+import {
+  applyRect,
+  createCurve,
+  playCurve,
+  prefersReducedMotion,
+  shiftDelta,
+  ZERO_RECT,
+  type Motion,
+} from './animate';
 import { useFloatyLayer } from './layer';
-import { floatyStore, measureElement, rectsEqual, selectSnapshot } from './store';
-import type { FloatyRect, FloatyTransition, FloatyTransitionConfig } from './types';
+import { floatyStore, measureElement, resolveTransition, selectSnapshot } from './store';
+import type { FloatyRect, FloatyTransition } from './types';
 import { FloatyContentContext } from './useFloatyState';
 import { useIsomorphicLayoutEffect } from './utils';
 
@@ -22,8 +30,9 @@ export interface FloatyProps<S = unknown> {
    */
   children?: ReactNode | ((state: S | undefined, status: FloatyRenderStatus) => ReactNode);
   /**
-   * `false` snaps to the new anchor instantly. An object overrides the
-   * global default `{ duration, easing }` set with `configureFloaty`.
+   * `false` snaps to the new anchor instantly. `{ duration?, easing? }`
+   * overrides the global easing default set with `configureFloaty`;
+   * `{ type: 'spring', ... }` uses a spring instead.
    */
   transition?: FloatyTransition;
   /**
@@ -33,7 +42,9 @@ export interface FloatyProps<S = unknown> {
   keepMounted?: boolean;
   /** Animate when the active anchor itself moves or resizes. Defaults to `true`. */
   animateLayoutChanges?: boolean;
+  /** Applied to the visible box that wraps `children`. */
   className?: string;
+  /** Applied to the visible box; avoid `transform`, `width` and `height`. */
   style?: CSSProperties;
   onTransitionStart?: () => void;
   onTransitionEnd?: () => void;
@@ -59,69 +70,84 @@ export function Floaty<S = unknown>({
   const snapshot = useStore(floatyStore, selectSnapshot(floatyId));
   const defaults = useStore(floatyStore, (state) => state.config.transition);
 
-  const itemRef = useRef<HTMLDivElement | null>(null);
-  const animationRef = useRef<RectAnimation | null>(null);
+  const outerRef = useRef<HTMLDivElement | null>(null);
+  const innerRef = useRef<HTMLDivElement | null>(null);
+  const motionRef = useRef<Motion | null>(null);
   const lastAnchorRef = useRef<HTMLElement | null>(null);
+  const lastTargetRef = useRef<FloatyRect | null>(null);
 
-  const config: FloatyTransitionConfig | false =
-    transition === false
-      ? false
-      : {
-          duration: transition?.duration ?? defaults.duration,
-          easing: transition?.easing ?? defaults.easing,
-        };
+  const config = resolveTransition(transition, defaults);
   const latest = useRef({ config, animateLayoutChanges, onTransitionStart, onTransitionEnd });
   latest.current = { config, animateLayoutChanges, onTransitionStart, onTransitionEnd };
 
+  // The outer element always sits exactly on the target (the "offset"); the
+  // inner element only animates the remaining gap (the "delta") towards it.
+  // Scrolls move the outer element and never touch a running animation.
   useIsomorphicLayoutEffect(() => {
-    const el = itemRef.current;
+    const outer = outerRef.current;
+    const inner = innerRef.current;
     const { anchor, rect, reason } = snapshot;
-    const running = animationRef.current;
+    const running = motionRef.current;
     const { setAnimating } = floatyStore.getState();
 
     const stop = () => {
-      if (!animationRef.current) return;
-      animationRef.current.cancel();
-      animationRef.current = null;
+      if (!motionRef.current) return;
+      motionRef.current.cancel();
+      motionRef.current = null;
       setAnimating(floatyId, false);
     };
 
-    if (!el || !layer) {
+    if (!outer || !inner || !layer) {
       stop();
       lastAnchorRef.current = null;
+      lastTargetRef.current = null;
       return;
     }
 
     const prevAnchor = lastAnchorRef.current;
+    const prevTarget = lastTargetRef.current;
     lastAnchorRef.current = anchor;
 
     if (!anchor || !rect) {
       stop();
-      setState(el, 'hidden');
+      lastTargetRef.current = null;
+      setState(outer, 'hidden');
       return;
     }
 
     const { config, animateLayoutChanges, onTransitionStart, onTransitionEnd } = latest.current;
-    const layerRect = measureElement(layer);
-    const to = relativeTo(rect, layerRect);
+    const to = relativeTo(rect, measureElement(layer));
+    lastTargetRef.current = to;
+    applyRect(outer, to);
 
-    const anchorSwitched = prevAnchor !== null && prevAnchor !== anchor;
-    const layoutShifted = prevAnchor === anchor && reason === 'layout' && animateLayoutChanges;
-    const scrolledMidAnimation = running !== null && prevAnchor === anchor && reason === 'scroll';
-    const shouldAnimate =
-      config !== false &&
-      !prefersReducedMotion() &&
-      (anchorSwitched || layoutShifted || scrolledMidAnimation);
+    const sameAnchor = prevAnchor === anchor;
+    const anchorSwitched = prevAnchor !== null && !sameAnchor;
+    // Easing rides along with mid-flight layout shifts; springs absorb them
+    // into the gap and keep their velocity.
+    const layoutShifted =
+      sameAnchor &&
+      reason === 'layout' &&
+      animateLayoutChanges &&
+      (!running || (config !== false && config.type === 'spring'));
 
-    const duration = config && scrolledMidAnimation ? running.remaining() : config ? config.duration : 0;
-    const from = shouldAnimate ? relativeTo(measureElement(el), layerRect) : null;
+    if (!prevTarget || !(anchorSwitched || layoutShifted)) {
+      if (!running) setState(outer, 'visible');
+      return;
+    }
+
+    const { delta: currentDelta, velocity } = running?.current() ?? {
+      delta: ZERO_RECT,
+      velocity: ZERO_RECT,
+    };
+    const delta = shiftDelta(currentDelta, prevTarget, to);
+    const curve =
+      config !== false && !prefersReducedMotion() ? createCurve(config, delta, velocity) : null;
 
     running?.cancel();
-    animationRef.current = null;
-    applyRect(el, to);
+    motionRef.current = null;
 
-    if (!config || !from || duration <= 0 || rectsEqual(from, to)) {
-      setState(el, 'visible');
+    if (!curve || curve.duration <= 0) {
+      setState(outer, 'visible');
       if (running) {
         setAnimating(floatyId, false);
         onTransitionEnd?.();
@@ -129,14 +155,14 @@ export function Floaty<S = unknown>({
       return;
     }
 
-    setState(el, 'animating');
+    setState(outer, 'animating');
     if (!running) {
       setAnimating(floatyId, true);
       onTransitionStart?.();
     }
-    animationRef.current = animateRect(el, from, to, { duration, easing: config.easing }, () => {
-      animationRef.current = null;
-      setState(el, 'visible');
+    motionRef.current = playCurve(inner, curve, () => {
+      motionRef.current = null;
+      setState(outer, 'visible');
       floatyStore.getState().setAnimating(floatyId, false);
       latest.current.onTransitionEnd?.();
     });
@@ -144,8 +170,8 @@ export function Floaty<S = unknown>({
 
   useIsomorphicLayoutEffect(
     () => () => {
-      animationRef.current?.cancel();
-      animationRef.current = null;
+      motionRef.current?.cancel();
+      motionRef.current = null;
       floatyStore.getState().setAnimating(floatyId, false);
     },
     [floatyId],
@@ -169,20 +195,33 @@ export function Floaty<S = unknown>({
 
   return createPortal(
     <div
-      ref={itemRef}
+      ref={outerRef}
       data-floaty={floatyId}
-      className={className}
       style={{
         position: 'absolute',
         top: 0,
         left: 0,
-        boxSizing: 'border-box',
-        pointerEvents: 'auto',
+        pointerEvents: 'none',
         willChange: 'transform',
-        ...style,
       }}
     >
-      <FloatyContentContext.Provider value={contentContext}>{content}</FloatyContentContext.Provider>
+      <div
+        ref={innerRef}
+        data-floaty-content=""
+        className={className}
+        style={{
+          boxSizing: 'border-box',
+          width: '100%',
+          height: '100%',
+          pointerEvents: 'auto',
+          willChange: 'transform',
+          ...style,
+        }}
+      >
+        <FloatyContentContext.Provider value={contentContext}>
+          {content}
+        </FloatyContentContext.Provider>
+      </div>
     </div>,
     layer,
   );

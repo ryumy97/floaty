@@ -19,8 +19,9 @@ trade-offs, and decision records), see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.
 - `<FloatyAnchor floatyId="x">` is a plain `div` placeholder that reserves space in your
   layout. The floating content is positioned and sized over the active anchor.
 - When the active anchor changes (one layout unmounts and another mounts), the content
-  animates from its old rect to the new one (FLIP, via the Web Animations API), or snaps
-  if transitions are disabled or the user prefers reduced motion.
+  animates from its old rect to the new one (FLIP, via the Web Animations API) with an
+  easing curve or a spring, or snaps if transitions are disabled or the user prefers
+  reduced motion. Scrolling during a transition never restarts it.
 
 ## Usage
 
@@ -60,10 +61,36 @@ Global options; can be called at any time (changes apply immediately).
 | Option | Type | Default |
 | --- | --- | --- |
 | `zIndex` | `number` | `1000` |
-| `transition` | `{ duration?: number; easing?: string }` | `{ duration: 300, easing: 'ease-in-out' }` |
+| `transition` | easing or spring (see [Transitions](#transitions)) | `{ duration: 300, easing: 'ease-in-out' }` |
 | `layerClassName` | `string` | |
 
 `resetFloaty()` restores the initial state (useful between tests).
+
+### Transitions
+
+`transition` (global or per `Floaty`) is one of:
+
+```ts
+false                                           // snap (per Floaty only)
+{ duration?: 300, easing?: 'ease-in-out' }      // easing: any CSS easing
+{ type: 'spring', duration: 400, bounce?: 0 }   // spring, visual attributes
+{ type: 'spring', stiffness: 300, damping: 25, mass?: 1 } // spring, physical attributes
+```
+
+- **Visual spring:** `duration` is the perceptual duration in ms (the spring's period);
+  `bounce` ranges from `-1` to `1`: `0` settles without overshoot, positive values bounce,
+  negative values are overdamped. The tail may run slightly past `duration`.
+- **Physical spring:** `stiffness`, `damping` and `mass` of a damped harmonic oscillator,
+  with time in seconds.
+- **`bounceSize`** (springs only): `false` (default) animates width and height with the
+  same spring critically damped, so the box never overshoots its size. Pass spring
+  attributes (visual or physical) to give the size its own spring, e.g.
+  `{ type: 'spring', duration: 400, bounce: 0.3, bounceSize: { duration: 400, bounce: 0.1 } }`.
+- Objects without `type: 'spring'` are easing transitions; missing fields come from the
+  global easing default (or `{ duration: 300, easing: 'ease-in-out' }` if the global
+  default is a spring).
+- Interruptions keep momentum with springs: a new anchor or a layout shift mid-flight
+  continues from the current position and velocity. Scrolling never restarts a transition.
 
 ### `<Floaty>`
 
@@ -71,13 +98,15 @@ Global options; can be called at any time (changes apply immediately).
 | --- | --- | --- |
 | `floatyId` | `string` | required |
 | `children` | `ReactNode \| (state, { hasAnchor, isAnimating }) => ReactNode` | |
-| `transition` | `false \| { duration?, easing? }` | global default |
+| `transition` | `false`, easing or spring (see [Transitions](#transitions)) | global default |
 | `keepMounted` | `boolean`: keep children mounted (hidden) while no anchor exists | `true` |
 | `animateLayoutChanges` | `boolean`: also animate when the active anchor itself moves or resizes | `true` |
-| `className` / `style` | wrapper styling | |
+| `className` / `style` | styling of the visible box around `children` (avoid `transform`, `width`, `height`) | |
 | `onTransitionStart` / `onTransitionEnd` | `() => void` | |
 
-The wrapper exposes `data-floaty-state="hidden" | "visible" | "animating"` for styling.
+The content renders as `div[data-floaty] > div[data-floaty-content]`. The outer element sits
+on the anchor's rect and exposes `data-floaty-state="hidden" | "visible" | "animating"`; the
+inner element is the visible box that animates and receives `className` and `style`.
 
 ### `<FloatyAnchor>`
 

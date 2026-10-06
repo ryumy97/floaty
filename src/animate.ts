@@ -1,10 +1,46 @@
-import type { FloatyRect, FloatyTransitionConfig } from './types';
+import { settleTime, sizeSpringParams, springAt, springParams, type SpringParams } from './spring';
+import type {
+  FloatyEasingTransition,
+  FloatyRect,
+  FloatySpringTransition,
+  FloatyTransitionConfig,
+} from './types';
 
-export interface RectAnimation {
-  /** Stops the animation without calling `onFinish`. */
+const AXES = ['x', 'y', 'width', 'height'] as const;
+type Axis = (typeof AXES)[number];
+
+export const ZERO_RECT: FloatyRect = { x: 0, y: 0, width: 0, height: 0 };
+
+function mapRect(fn: (axis: Axis) => number): FloatyRect {
+  return { x: fn('x'), y: fn('y'), width: fn('width'), height: fn('height') };
+}
+
+/** `delta + from - to`: a gap carried over when the target jumps from `from` to `to`. */
+export function shiftDelta(delta: FloatyRect, from: FloatyRect, to: FloatyRect): FloatyRect {
+  return mapRect((a) => delta[a] + from[a] - to[a]);
+}
+
+/** Gap between the visible box and its target (px), and how fast it changes (px/s). */
+export interface MotionState {
+  delta: FloatyRect;
+  velocity: FloatyRect;
+}
+
+const AT_REST: MotionState = { delta: ZERO_RECT, velocity: ZERO_RECT };
+
+/** Trajectory of the gap from its initial value to zero. */
+export interface MotionCurve {
+  /** Milliseconds until the gap is zero; `0` means there is nothing to animate. */
+  duration: number;
+  at(t: number): MotionState;
+  /** Set when the whole curve is one CSS-eased segment. */
+  easing?: string;
+}
+
+export interface Motion {
+  current(): MotionState;
+  /** Stops without calling `onFinish` and restores the element's resting styles. */
   cancel(): void;
-  /** Milliseconds left until the animation finishes. */
-  remaining(): number;
 }
 
 export function rectStyle(rect: FloatyRect) {
@@ -22,6 +58,18 @@ export function applyRect(el: HTMLElement, rect: FloatyRect) {
   el.style.height = style.height;
 }
 
+const round = (n: number) => Math.round(n * 100) / 100 || 0;
+const calc = (d: number) => `calc(100% ${d < 0 ? '-' : '+'} ${Math.abs(round(d))}px)`;
+
+/** Styles that draw a box `delta` away from its parent's box. */
+export function deltaStyle(delta: FloatyRect) {
+  return {
+    transform: `translate3d(${round(delta.x)}px, ${round(delta.y)}px, 0)`,
+    width: calc(delta.width),
+    height: calc(delta.height),
+  };
+}
+
 export function prefersReducedMotion(): boolean {
   return (
     typeof window !== 'undefined' &&
@@ -30,74 +78,125 @@ export function prefersReducedMotion(): boolean {
   );
 }
 
-/**
- * Animates `el` from `from` to `to`. The caller must already have applied
- * `to` as the element's resting inline style (FLIP "last" state).
- */
-export function animateRect(
-  el: HTMLElement,
-  from: FloatyRect,
-  to: FloatyRect,
-  { duration, easing }: FloatyTransitionConfig,
-  onFinish: () => void,
-): RectAnimation {
-  const keyframes = [rectStyle(from), rectStyle(to)];
+export function createCurve(
+  config: FloatyTransitionConfig,
+  delta: FloatyRect,
+  velocity: FloatyRect = ZERO_RECT,
+): MotionCurve {
+  return config.type === 'spring'
+    ? springCurve(config, delta, velocity)
+    : easingCurve(config, delta);
+}
 
+function easingCurve({ duration, easing }: FloatyEasingTransition, delta: FloatyRect): MotionCurve {
+  const ease = easingFunction(easing);
+  const still = AXES.every((a) => delta[a] === 0);
+  return {
+    duration: still ? 0 : Math.max(0, duration),
+    easing,
+    at(t) {
+      if (duration <= 0 || t >= duration) return AT_REST;
+      const p = Math.max(0, t / duration);
+      const step = 1e-3;
+      const slope = (ease(Math.min(1, p + step)) - ease(p)) / step;
+      const remaining = 1 - ease(p);
+      return {
+        delta: mapRect((a) => delta[a] * remaining),
+        velocity: mapRect((a) => (-delta[a] * slope * 1000) / duration),
+      };
+    },
+  };
+}
+
+function springCurve(
+  config: FloatySpringTransition,
+  delta: FloatyRect,
+  velocity: FloatyRect,
+): MotionCurve {
+  const position = springParams(config);
+  const size = sizeSpringParams(config.bounceSize, position);
+  const paramsOf = (a: Axis): SpringParams => (a === 'x' || a === 'y' ? position : size);
+  const from = (a: Axis) => ({ value: delta[a], velocity: velocity[a] });
+  const duration = Math.max(...AXES.map((a) => settleTime(paramsOf(a), from(a)))) * 1000;
+  return {
+    duration,
+    at(t) {
+      if (t >= duration) return AT_REST;
+      const delta = { ...ZERO_RECT };
+      const velocity = { ...ZERO_RECT };
+      for (const a of AXES) {
+        const s = springAt(paramsOf(a), from(a), Math.max(0, t) / 1000);
+        delta[a] = s.value;
+        velocity[a] = s.velocity;
+      }
+      return { delta, velocity };
+    },
+  };
+}
+
+const FRAME_MS = 1000 / 60;
+
+function sampleKeyframes(curve: MotionCurve): Keyframe[] {
+  const count = Math.max(1, Math.ceil(curve.duration / FRAME_MS));
+  const keyframes: Keyframe[] = [];
+  for (let i = 0; i <= count; i++) {
+    keyframes.push(deltaStyle(curve.at((curve.duration * i) / count).delta));
+  }
+  return keyframes;
+}
+
+/**
+ * Animates `el` (whose resting box equals its parent's) along `curve`. The
+ * gap is drawn relative to the parent, so moving the parent never disturbs
+ * a running animation.
+ */
+export function playCurve(el: HTMLElement, curve: MotionCurve, onFinish: () => void): Motion {
   if (typeof el.animate === 'function') {
-    const animation = el.animate(keyframes, { duration, easing });
+    const keyframes = curve.easing
+      ? [deltaStyle(curve.at(0).delta), deltaStyle(ZERO_RECT)]
+      : sampleKeyframes(curve);
+    const animation = el.animate(keyframes, {
+      duration: curve.duration,
+      easing: curve.easing ?? 'linear',
+    });
     animation.onfinish = onFinish;
     return {
+      current: () => curve.at(Number(animation.currentTime ?? 0)),
       cancel: () => {
         animation.onfinish = null;
         animation.cancel();
       },
-      remaining: () => {
-        const t = Number(animation.currentTime ?? 0);
-        return Math.max(0, duration - t);
-      },
     };
   }
-
-  return animateWithFrames(el, from, to, duration, easingFunction(easing), onFinish);
+  return playWithFrames(el, curve, onFinish);
 }
 
-function animateWithFrames(
-  el: HTMLElement,
-  from: FloatyRect,
-  to: FloatyRect,
-  duration: number,
-  ease: (t: number) => number,
-  onFinish: () => void,
-): RectAnimation {
+function playWithFrames(el: HTMLElement, curve: MotionCurve, onFinish: () => void): Motion {
+  const rest = { transform: el.style.transform, width: el.style.width, height: el.style.height };
+  const restore = () => Object.assign(el.style, rest);
   const start = performance.now();
   let frame = 0;
-  const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 
   const step = (now: number) => {
-    const t = duration > 0 ? Math.min(1, (now - start) / duration) : 1;
-    const e = ease(t);
-    applyRect(el, {
-      x: lerp(from.x, to.x, e),
-      y: lerp(from.y, to.y, e),
-      width: lerp(from.width, to.width, e),
-      height: lerp(from.height, to.height, e),
-    });
-    if (t < 1) {
-      frame = requestAnimationFrame(step);
-    } else {
+    const t = now - start;
+    if (t >= curve.duration) {
       frame = 0;
+      restore();
       onFinish();
+      return;
     }
+    Object.assign(el.style, deltaStyle(curve.at(t).delta));
+    frame = requestAnimationFrame(step);
   };
   step(start);
 
   return {
+    current: () => curve.at(performance.now() - start),
     cancel: () => {
       if (frame) cancelAnimationFrame(frame);
       frame = 0;
-      applyRect(el, to);
+      restore();
     },
-    remaining: () => Math.max(0, duration - (performance.now() - start)),
   };
 }
 

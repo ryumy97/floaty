@@ -11,5 +11,10 @@ export type {
   FloatyRect,
   FloatyTransition,
   FloatyTransitionConfig,
+  FloatyEasingTransition,
+  FloatySpringTransition,
+  FloatySpringOptions,
+  FloatySpringPhysics,
+  FloatySpringVisual,
   FloatyChangeReason,
 } from './types';

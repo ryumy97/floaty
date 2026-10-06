@@ -36,7 +36,9 @@ positions the content over it, animating between anchors when the layout changes
 **Goals**
 
 - Keep both React state and DOM state of floating content across arbitrary layout changes.
-- Visual continuity: animate (FLIP) between old and new positions, or snap on request.
+- Visual continuity: animate (FLIP) between old and new positions with an easing curve or a
+  spring, or snap on request. Interruptions (scroll, layout shifts, new anchors) never
+  restart the motion from rest.
 - Minimal API: one component for content, one for placeholders, an optional hook.
 - No provider required; works anywhere in the tree.
 - Small footprint: no animation library; only `react`, `react-dom` and `zustand`.
@@ -98,7 +100,8 @@ src/
   useRectTracker.ts  Measurement triggers for the active anchor (resize, scroll, RO)
   useFloaty.ts       Read-only status hook (incl. anchor state) + remeasure()
   useFloatyState.ts  Content context + useFloatyState() for reading anchor state inside content
-  animate.ts         FLIP animation (Web Animations API + rAF fallback), easing
+  animate.ts         Motion curves (easing, spring) for the delta, WAAPI + rAF drivers, easing solver
+  spring.ts          Closed-form damped harmonic oscillator, parameter mapping, settle time
   utils.ts           useIsomorphicLayoutEffect
 ```
 
@@ -121,7 +124,13 @@ flowchart TD
   useFloaty --> store
   layer --> store
   store --> types
+  animate --> spring
   animate --> types
+  spring --> types
+  Floaty --> utils
+  FloatyAnchor --> utils
+  useRectTracker --> utils
+  layer --> utils
 ```
 
 ## 5. State model
@@ -133,7 +142,7 @@ consumed from React via `useStore(floatyStore, selector)`.
 
 ```ts
 interface FloatyState {
-  config: FloatyConfig;                         // zIndex, transition, layerClassName
+  config: FloatyConfig;                         // zIndex, transition (easing or spring), layerClassName
   anchors: Record<string, HTMLElement[]>;       // mounted anchors per floatyId; last = active
   snapshots: Record<string, FloatySnapshot>;    // derived, immutable per floatyId
   registerAnchor(floatyId, el, state?): () => void;  // returns unregister
@@ -184,7 +193,7 @@ Design notes:
 | `setAnchorState(id, el, state)` | No-op if shallow-equal; otherwise records it and, if `el` is active, patches `snapshot.state` without bumping `version` |
 | `measure(id, reason)` | Reads `getBoundingClientRect()` of the active anchor; updates only if the rect differs |
 | `setAnimating(id, b)` | Updates `isAnimating` without bumping `version` |
-| `configureFloaty(opts)` | Shallow-merges config (deep-merges `transition`) |
+| `configureFloaty(opts)` | Shallow-merges config; `transition` goes through `resolveTransition` (springs replace, easing objects merge into the current easing default) |
 | `resetFloaty()` | Restores initial state (tests) |
 
 ## 6. Component internals
@@ -226,16 +235,22 @@ Only the **active** anchor installs listeners, so the cost is per `floatyId`, no
 2. Subscribes to its snapshot and to `config.transition`.
 3. Returns `null` until the layer exists (SSR and first client render), or while there is
    no anchor and `keepMounted={false}`.
-4. Otherwise portals a wrapper `div` (`position: absolute; top: 0; left: 0`) containing
-   `children` into the layer.
+4. Otherwise portals two nested `div`s into the layer:
+   - **Outer** (`data-floaty`): `position: absolute; top: 0; left: 0; pointer-events: none`.
+     Always sits exactly on the target rect (the *offset*, section 7.2) and carries
+     `visibility`, `aria-hidden` and `data-floaty-state`. It is never animated.
+   - **Inner** (`data-floaty-content`): the visible box around `children`. Rests at
+     `width: 100%; height: 100%` of the outer, has `pointer-events: auto`, receives the
+     user's `className` and `style`, and runs the transition (the *delta*).
 5. A single **positioning layout effect** (section 7) runs when `version`, `anchor`,
    `layer`, `floatyId` or `keepMounted` change.
 
-Positioning is applied **imperatively** to the wrapper (`transform`, `width`, `height`,
-`visibility`, `data-floaty-state`) rather than through React's `style` prop. That keeps
-high-frequency updates (scroll) out of React reconciliation, and lets the Web Animations API
-own the element during transitions. React only controls the static styles; user `style`
-is merged in and should avoid `transform`, `width` and `height`.
+Positioning is applied **imperatively** (outer: `transform`, `width`, `height`,
+`visibility`, `data-floaty-state`; inner: animations only) rather than through React's
+`style` prop. That keeps high-frequency updates (scroll) out of React reconciliation, and
+lets the Web Animations API own the inner element during transitions. React only controls
+the static styles; user `style` is merged into the inner element and should avoid
+`transform`, `width` and `height`.
 
 Rendering `Floaty` on scroll does not re-render `children`: the `children` element identity
 is unchanged and the content context value is memoized on `state`, so React bails out of
@@ -277,77 +292,137 @@ flowchart LR
   origin. `Floaty` still subtracts the layer's own rect (`relativeTo(rect, layerRect)`) so
   positioning stays correct if the layer is offset (for example, by a transformed ancestor
   or custom layer styling).
-- Content is placed with `translate3d(x, y, 0)` plus explicit `width` and `height`. The
-  transform keeps movement on the compositor; the size change is a layout of the content
-  only, which keeps it simple and accurate (no scale distortion of text or video).
+- The outer element is placed with `translate3d(x, y, 0)` plus explicit `width` and
+  `height`. The transform keeps movement on the compositor; the size change is a layout of
+  the content only, which keeps it simple and accurate (no scale distortion of text or
+  video).
 
-### 7.2 The positioning effect (FLIP)
+### 7.2 Offset and delta
+
+Every rendered rect is split into two parts:
+
+\[
+\text{visual}(t) = \text{target} + \Delta(t), \qquad \Delta(t) \to 0
+\]
+
+- **Offset (target):** the active anchor's rect in layer coordinates, written directly to
+  the outer element on every snapshot change. Scrolling only ever changes the offset.
+- **Delta (Δ):** the gap between what is on screen and the target when a transition
+  starts. Only Δ is animated, on the inner element and on its own clock, as
+  `translate3d(Δx, Δy, 0)`, `width: calc(100% + Δw)`, `height: calc(100% + Δh)`, down to
+  zero.
+
+Because the inner element is drawn relative to the outer one, a target change that is
+not a transition (a scroll, or a layout shift that rides along) moves the outer element
+and the running animation keeps going untouched: no restart, no remaining-time
+bookkeeping, no layout read.
+
+When a transition is (re)started, the new gap is computed without reading layout:
+
+\[
+\Delta_{\text{new}} = \Delta_{\text{current}} + \text{target}_{\text{prev}} - \text{target}_{\text{new}}
+\]
+
+`Δ_current` and its velocity come from the running motion's curve evaluated at its
+current time (zero at rest). Springs also take the current velocity, so momentum carries
+through the interruption; easing curves restart their easing from the carried-over gap.
 
 ```mermaid
 flowchart TD
-  start([snapshot changed]) --> hasEl{"wrapper and layer exist?"}
-  hasEl -- no --> resetPrev["stop animation, forget previous anchor"] --> done([end])
+  start([snapshot changed]) --> hasEl{"outer, inner and layer exist?"}
+  hasEl -- no --> resetPrev["stop motion, forget previous anchor and target"] --> done([end])
   hasEl -- yes --> hasAnchor{"anchor and rect?"}
-  hasAnchor -- no --> hide["stop animation, set hidden"] --> done
-  hasAnchor -- yes --> decide["decide shouldAnimate (7.3)"]
-  decide --> first["FIRST: if animating, measure wrapper's current rect"]
-  first --> cancel["cancel any running animation"]
-  cancel --> last["LAST: apply target rect as inline style"]
-  last --> needAnim{"animate and from differs from to?"}
-  needAnim -- no --> visible["set visible; finish any interrupted transition"] --> done
-  needAnim -- yes --> play["INVERT + PLAY: element.animate(from to to)"] --> done
+  hasAnchor -- no --> hide["stop motion, set hidden"] --> done
+  hasAnchor -- yes --> offset["OFFSET: write target to outer"]
+  offset --> retarget{"anchor switched or animated layout shift (7.3)?"}
+  retarget -- no --> keep["keep any running motion; visible if at rest"] --> done
+  retarget -- yes --> gap["gap = current gap + prev target - new target"]
+  gap --> curve{"animate and curve has duration?"}
+  curve -- no --> snap["cancel motion, visible, end interrupted transition"] --> done
+  curve -- yes --> play["cancel motion, play curve on inner (carrying velocity)"] --> done
 ```
 
 Key properties:
 
-- **Interruptible.** "First" is measured from the wrapper's *current, possibly
-  mid-animation* rect (`getBoundingClientRect()` reflects running animations). A layout
-  switch during a transition therefore continues smoothly from wherever the content is.
-- **Final state is always in inline styles.** Animations use `fill: none`; when an
-  animation ends or is cancelled, the element is already at its resting position. There is
-  no "stuck mid-animation" state.
+- **Interruptible without restarts.** Scrolls never touch the motion; retargets continue
+  from the current on-screen gap (and velocity, for springs).
+- **Resting state is always in inline styles.** The outer element always holds the target,
+  and the inner element's resting styles (`100%` size, no transform) are static. Animations
+  use `fill: none`, so cancelling or finishing leaves the box exactly on the target.
 - **Lifecycle callbacks** fire once per continuous transition: `onTransitionStart` when
   movement begins from rest, `onTransitionEnd` when it finishes or is resolved by a snap.
   Retargeting mid-flight does not re-fire `onTransitionStart`.
 
 ### 7.3 Animate-or-snap decision
 
-`shouldAnimate = transition !== false && !prefersReducedMotion() && (one of the triggers below)`
+A **retarget** (new Δ) happens on these triggers, provided
+`transition !== false && !prefersReducedMotion()`; otherwise the trigger snaps:
 
-| Trigger | Condition | Duration |
-| --- | --- | --- |
-| Anchor switched | previous anchor was non-null and differs from the current one | `transition.duration` |
-| Layout shifted | same anchor, `reason === 'layout'`, `animateLayoutChanges` | `transition.duration` |
-| Scrolled mid-animation | same anchor, `reason === 'scroll'`, an animation is running | remaining time of the running animation |
+| Trigger | Condition |
+| --- | --- |
+| Anchor switched | previous anchor was non-null and differs from the current one |
+| Layout shifted at rest | same anchor, `reason === 'layout'`, `animateLayoutChanges`, nothing running |
+| Layout shifted mid-flight (springs only) | same anchor, `reason === 'layout'`, `animateLayoutChanges`, motion running, spring transition |
 
-Everything else **snaps**:
+Everything else only updates the offset:
 
 - **First placement**: there was no previous anchor (initial mount, or re-anchoring after a
   period with no anchor). Flying in from an invisible, stale position would look wrong.
-- **Scroll at rest**: following scroll must be instantaneous, otherwise content lags
-  behind the page.
+- **Scroll**, at rest or mid-flight: the box follows the page instantly; a running
+  transition continues toward the moving target.
+- **Layout shift mid-flight with easing**: the box jumps with the anchor, like scroll.
+  Easing has no velocity to carry, so restarting it would visibly stall; springs absorb
+  the shift instead.
 - `transition={false}` or reduced motion.
 
-Scrolling during a transition retargets the animation and keeps the remaining time, so the
-content still lands on time at the anchor's new scrolled position.
+### 7.4 Motion engine (`src/animate.ts`, `src/spring.ts`)
 
-### 7.4 Animation engine (`src/animate.ts`)
+A **curve** describes Δ (and its velocity) from its start value to zero:
+`{ duration, at(t) => { delta, velocity }, easing? }`. `createCurve(config, delta, velocity)`
+builds one per transition type:
 
-- **Primary: Web Animations API.** `element.animate([fromStyle, toStyle], { duration, easing })`.
-  It accepts any CSS easing, runs off the main thread where the browser can, and needs no
-  dependency. `cancel()` clears `onfinish` first, so a cancelled animation never reports
-  completion.
-- **Fallback: `requestAnimationFrame`** when `element.animate` is unavailable. It
-  interpolates the rect each frame with an easing function. Named CSS easings and
-  `cubic-bezier(...)` are supported through a bisection-based cubic-bezier solver; invalid
-  input falls back to `ease-in-out`.
-- Both expose the same `RectAnimation` interface: `cancel()` and `remaining()`.
+- **Easing:** `Δ(t) = Δ₀ · (1 - ease(t / duration))`, velocity by finite difference.
+  Named CSS easings and `cubic-bezier(...)` are evaluated with a bisection-based
+  cubic-bezier solver (invalid input falls back to `ease-in-out`), which is used both for
+  the rAF fallback and for reading the current gap of a running WAAPI animation.
+- **Spring:** one damped harmonic oscillator per axis, solved in closed form
+  (`springAt`: underdamped, critically damped and overdamped cases), starting from the
+  axis's gap and velocity. `duration` is the slowest axis's settle time (within 0.5 px and
+  5 px/s, capped at 10 s). Position (x, y) uses the configured spring; size (width,
+  height) uses `bounceSize`, which defaults to the same frequency critically damped so the
+  box never overshoots its size.
+
+Spring parameters (unit mass, time in seconds):
+
+| Attributes | Mapping |
+| --- | --- |
+| Physical `{ stiffness, damping, mass = 1 }` | `ω₀ = √(k / m)`, `ζ = c / (2√(k·m))` |
+| Visual `{ duration, bounce = 0 }` | `ω₀ = 2π / duration`, `ζ = 1 - bounce` (`bounce ≥ 0`) or `1 / (1 + bounce)` (`bounce < 0`) |
+
+A curve is played on the inner element by a driver that returns a `Motion`
+(`current()`, `cancel()`):
+
+- **Primary: Web Animations API.** Easing curves play as two keyframes with the CSS
+  easing. Spring curves are sampled at 60 Hz into keyframes played with
+  `easing: 'linear'`; sampling keyframes (rather than a CSS `linear()` easing) lets each
+  axis follow its own shape after a retarget. `current()` evaluates the curve at
+  `animation.currentTime`. `cancel()` clears `onfinish` first, so a cancelled animation
+  never reports completion.
+- **Fallback: `requestAnimationFrame`** when `element.animate` is unavailable. It writes
+  the inner element's Δ styles each frame and restores its resting styles on finish or
+  cancel. The outer element is written the same way in both paths.
+
+Transition configs are resolved by `resolveTransition(transition, base)` (`src/store.ts`):
+`false` snaps; `{ type: 'spring', ... }` is used as given; other objects are easing
+transitions whose missing fields come from the base when it is an easing, or from
+`DEFAULT_TRANSITION` when the base is a spring.
 
 ## 8. Overlay layer lifecycle (`src/layer.ts`)
 
 - A single `div[data-floaty-layer]` is appended to `document.body`, styled
-  `position: fixed; inset: 0; pointer-events: none`. Floating wrappers set
-  `pointer-events: auto`, so only the content itself captures input.
+  `position: fixed; inset: 0; pointer-events: none`. Each floaty's outer element also has
+  `pointer-events: none` and its inner (visible) element sets `pointer-events: auto`, so
+  only the visible content captures input, including mid-transition.
 - **Ref-counted.** Each mounted `Floaty` acquires the layer in a layout effect and releases
   it on cleanup. The layer is created on first acquire and removed on last release. This is
   safe under React StrictMode's double effect invocation (acquire, release, acquire).
@@ -375,8 +450,9 @@ How the code guarantees it:
    **synchronously after the commit and before paint**. `Floaty` renders once, reads the
    final snapshot (anchor B), and its own layout effect runs the FLIP before the browser
    paints.
-4. `Floaty` measures "First" from its own wrapper, which has not moved yet, so the
-   starting point is A's position even though A no longer exists.
+4. `Floaty` remembers the last target it wrote (A's rect) and computes the starting gap
+   from it and the running motion (section 7.2), so the starting point is A's position
+   even though A no longer exists.
 
 ```mermaid
 sequenceDiagram
@@ -395,7 +471,7 @@ sequenceDiagram
   B->>S: registerAnchor - anchor B, rect measured, version++
   S-->>F: subscription - synchronous re-render
   F->>F: layout effect sees prev anchor A, current anchor B
-  F->>F: FIRST from wrapper, LAST = B rect, play animation
+  F->>F: outer = B rect, gap = A rect - B rect, play gap on inner
   F->>DOM: first painted frame already shows the animation start
 ```
 
@@ -410,8 +486,10 @@ swap" cover it.
 | Re-render scope | Per-`floatyId` selectors; anchors subscribe to a boolean (`isActive`) only |
 | Scroll cost | One rAF-coalesced `getBoundingClientRect()` per active anchor per frame; updates skipped when the rect is unchanged |
 | Children re-renders | `children` identity is stable, so `Floaty` re-renders never re-render content |
-| Style writes | Imperative writes to three properties; no React style diffing on hot paths |
-| Animation | Compositor-friendly `transform`; `width`/`height` animate layout of the content only |
+| Style writes | Imperative writes to the outer element (`transform`, `width`, `height`, `visibility`, `data-floaty-state`); no React style diffing on hot paths |
+| Animation | Compositor-friendly `transform`; `width`/`height` animate layout of the content only. Scrolls never restart or re-measure a running animation |
+| Retargeting | No layout reads: the current gap comes from evaluating the curve at the animation's current time |
+| Spring setup | Settle time is found by stepping the closed-form solution at 120 Hz (at most 10 s), and keyframes are sampled at 60 Hz, once per (re)target |
 | Listener count | Only active anchors attach observers and listeners |
 
 Known costs: animating `width`/`height` lays out the floating subtree every frame. For very
@@ -441,7 +519,7 @@ heavy content, a future `sizeMode: 'scale'` option could animate `scale` instead
 
 ## 13. Accessibility
 
-- While hidden (no anchor, `keepMounted`), the wrapper gets `visibility: hidden` and
+- While hidden (no anchor, `keepMounted`), the outer element gets `visibility: hidden` and
   `aria-hidden="true"`, which removes it from the accessibility tree and from pointer and
   keyboard interaction while still keeping state.
 - `prefers-reduced-motion: reduce` turns every transition into a snap.
@@ -468,8 +546,8 @@ jsdom has no layout engine, so the setup installs deterministic fakes:
 
 | Fake | Behavior |
 | --- | --- |
-| `HTMLElement.prototype.getBoundingClientRect` | Returns the rect from a `data-rect="x,y,w,h"` attribute, otherwise derives it from inline `translate3d`/`width`/`height` (so FLIP "First" measurements of the wrapper work) |
-| `HTMLElement.prototype.animate` | Records keyframes and options; exposes `finish()` to complete an animation on demand |
+| `HTMLElement.prototype.getBoundingClientRect` | Returns the rect from a `data-rect="x,y,w,h"` attribute, otherwise derives it from inline `translate3d`/`width`/`height` |
+| `HTMLElement.prototype.animate` | Records keyframes and options; `currentTime` is settable to simulate progress; `finish()` completes an animation on demand |
 | `ResizeObserver` | No-op stub |
 | `window.matchMedia` | Reduced motion controllable through `reducedMotion.value` |
 | Store | `resetFloaty()` before each test for isolation |
@@ -479,7 +557,12 @@ Coverage by behavior:
 - Portal placement in a body-level layer; layer removal on last unmount.
 - **State persistence across a layout swap** (no remount, counter preserved).
 - Positioning follows the new anchor; snap with `transition={false}` and reduced motion.
-- Animation keyframes run from the old rect to the new rect; start and end callbacks.
+- Animation keyframes run the gap (old rect minus new rect) to zero on the inner element
+  while the outer element sits on the new rect; start and end callbacks.
+- Retargeting: scroll mid-transition moves the target without restarting the animation;
+  easing rides along with mid-flight layout shifts; springs absorb them into the gap;
+  spring keyframes are sampled and end at rest; spring and partial-easing resolution
+  against a spring global default.
 - Global defaults through `configureFloaty`; reactive `zIndex`/`layerClassName`.
 - `keepMounted` true (hidden, preserved) versus false (unmounted, reset).
 - Anchor stack: most recent wins, fallback on unmount.
@@ -490,6 +573,10 @@ Coverage by behavior:
   effects; updates without repositioning; shallow equality (no extra renders); inactive
   anchors ignored; last state kept with no anchor.
 - Unit tests for the easing solver and the store's change detection.
+- Spring unit tests (`tests/spring.test.ts`): visual and physical parameter mapping,
+  `bounceSize`, all three damping regimes start at the initial state and settle, resuming
+  from a sampled state matches the uninterrupted solution, overshoot only when
+  underdamped, size never overshoots by default, velocity carried into a retargeted curve.
 
 Not covered by unit tests (verified manually in `demo/`): real browser layout, actual Web
 Animations API rendering, scroll tracking with real scroll containers. A future Playwright
@@ -540,21 +627,25 @@ suite against the demo would close this gap.
 
 ### ADR-4: Web Animations API with no animation dependency
 
-- **Decision:** implement FLIP on `element.animate`, with a small rAF fallback.
+- **Decision:** implement FLIP on `element.animate`, with a small rAF fallback. Springs are
+  solved in closed form and sampled into keyframes rather than pulling in a physics library.
 - **Why:** it supports any CSS easing, is interruptible, can run off the main thread, and
-  adds 0 kB of dependencies. The required motion is simple (rect to rect).
-- **Consequence:** physics-based springs are not supported; easing curves cover the
-  intended use cases.
+  adds 0 kB of dependencies. The required motion is simple (rect to rect), and the damped
+  harmonic oscillator has an exact solution, so no numeric integration is needed.
+- **Consequence:** spring keyframes are regenerated on every retarget (cheap: one settle
+  scan and about 60 samples per second of motion). Easing curves outside named easings and
+  `cubic-bezier(...)` (for example `steps()` or `linear(...)`) still play correctly via
+  WAAPI, but their current gap on interruption is approximated with `ease-in-out`.
 
 ### ADR-5: Imperative positioning
 
 - **Decision:** write `transform`, `width`, `height` and `visibility` directly to the
-  wrapper element.
+  outer element, and run transitions only on the inner element.
 - **Why:** it keeps scroll-frequency updates out of reconciliation, avoids conflicts
-  between React's style diffing and running animations, and makes FLIP's
-  measure-then-apply ordering explicit.
+  between React's style diffing and running animations, and keeps the resting state
+  (target on the outer element) independent of any animation.
 - **Consequence:** consumers should not set `transform`, `width` or `height` through
-  `Floaty`'s `style` prop.
+  `Floaty`'s `style` prop (it styles the inner element).
 
 ### ADR-6: Most-recent anchor wins
 
@@ -564,3 +655,17 @@ suite against the demo would close this gap.
   anchor).
 - **Consequence:** rendering two anchors for the same id at once is valid but only one
   shows content; that is intentional.
+
+### ADR-7: Animate the gap (delta), not absolute positions
+
+- **Decision:** split the rendered rect into an offset (the target, written directly to
+  the outer element) and a delta (the gap to the target, animated to zero on the inner
+  element).
+- **Why:** animating absolute rects meant every scroll during a transition had to cancel
+  and restart the animation, which restarted the easing curve (near-zero initial velocity)
+  and made content crawl behind the page; repeated layout shifts restarted full-duration
+  animations every frame. With the split, target changes never touch the animation, and
+  retargets carry the current gap (and velocity, for springs) without reading layout.
+- **Consequence:** two DOM elements per floaty (`data-floaty` and `data-floaty-content`).
+  With easing, a layout shift mid-flight jumps with the anchor instead of being animated;
+  springs absorb it smoothly.

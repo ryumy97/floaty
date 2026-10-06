@@ -82,6 +82,15 @@ body > div > .placeholder {
 }
 
 aside {
+  position: sticky;
+  top: 80px;
+  align-self: start;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+main {
   display: flex;
   flex-direction: column;
   gap: 12px;

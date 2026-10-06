@@ -4,6 +4,7 @@ import {
   configureFloaty,
   useFloaty,
   useFloatyState,
+  type FloatyTransition,
 } from 'floaty-component';
 import { useEffect, useState } from 'react';
 
@@ -76,6 +77,16 @@ function Placeholder({ label }: { label: string }) {
   return <div className="placeholder">{label}</div>;
 }
 
+function Placeholders({ label, count, from = 1 }: { label: string; count: number; from?: number }) {
+  return (
+    <>
+      {Array.from({ length: count }, (_, i) => (
+        <Placeholder key={i} label={`${label} ${from + i}`} />
+      ))}
+    </>
+  );
+}
+
 function Content({ layout }: { layout: Layout }) {
   switch (layout) {
     case 'grid':
@@ -87,23 +98,21 @@ function Content({ layout }: { layout: Layout }) {
             className="anchor"
             state={{ label: 'Grid counter', step: 1 }}
           />
-          <Placeholder label="Item" />
-          <Placeholder label="Item" />
-          <Placeholder label="Item" />
+          <Placeholders label="Item" count={18} />
         </div>
       );
     case 'list':
       return (
         <div className="list">
-          <Placeholder label="Row" />
+          <Placeholders label="Row" count={3} />
           <FloatyAnchor
             floatyId="counter"
             className="anchor row"
             state={{ label: 'List counter (x10)', step: 10 }}
           />
-          <Placeholder label="Row" />
+          <Placeholders label="Row" count={6} from={4} />
           <FloatyAnchor floatyId="player" className="anchor row tall" state={{ mode: 'full' }} />
-          <Placeholder label="Row" />
+          <Placeholders label="Row" count={10} from={10} />
         </div>
       );
     case 'sidebar':
@@ -118,7 +127,7 @@ function Content({ layout }: { layout: Layout }) {
             />
           </aside>
           <main>
-            <Placeholder label="Main content" />
+            <Placeholders label="Main content" count={12} />
           </main>
         </div>
       );
@@ -131,7 +140,13 @@ export function App() {
   const [layout, setLayout] = useState<Layout>('grid');
   const [animated, setAnimated] = useState(true);
   const [duration, setDuration] = useState(400);
-  const transition = animated ? { duration } : (false as const);
+  const [kind, setKind] = useState<'easing' | 'spring'>('easing');
+  const [bounce, setBounce] = useState(0.3);
+  const transition: FloatyTransition = !animated
+    ? false
+    : kind === 'spring'
+      ? { type: 'spring', duration, bounce }
+      : { duration };
 
   return (
     <>
@@ -165,6 +180,26 @@ export function App() {
           />
           {duration}ms
         </label>
+        <label>
+          <select value={kind} onChange={(e) => setKind(e.target.value as 'easing' | 'spring')}>
+            <option value="easing">easing</option>
+            <option value="spring">spring</option>
+          </select>
+        </label>
+        {kind === 'spring' && (
+          <label>
+            bounce
+            <input
+              type="range"
+              min={-0.5}
+              max={0.9}
+              step={0.05}
+              value={bounce}
+              onChange={(e) => setBounce(Number(e.target.value))}
+            />
+            {bounce.toFixed(2)}
+          </label>
+        )}
         <Status />
       </header>
 

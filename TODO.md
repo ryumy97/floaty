@@ -5,7 +5,10 @@ Findings from the architecture review of `docs/ARCHITECTURE.md` against `src/`. 
 
 ## High priority
 
-- [ ] **Retargeting restarts the easing curve** (`src/Floaty.tsx`, positioning effect)
+- [x] **Retargeting restarts the easing curve** (`src/Floaty.tsx`, positioning effect)
+  - Shipped (ADR-7, section 7.2). Deviations from the plan below: the anchor-switch gap is
+    computed from the last target and the running curve instead of measuring the inner
+    element, so `tests/setup.ts` needed no composed-rect fake.
   - Scroll mid-transition starts a new `ease-in-out` animation every frame (near-zero
     initial velocity), so content crawls while scrolling and catches up afterwards.
   - Continuous `layout` reasons (window drag-resize, CSS-transitioned anchor size) start a
@@ -43,8 +46,18 @@ Findings from the architecture review of `docs/ARCHITECTURE.md` against `src/`. 
        paths; the `requestAnimationFrame` fallback writes the inner's Δ styles each frame and
        never touches the outer, so scroll offsets apply even mid-flight.
 
-- [ ] **Spring animation (damped harmonic oscillator)** (new `src/spring.ts`, `src/animate.ts`,
+- [x] **Spring animation (damped harmonic oscillator)** (new `src/spring.ts`, `src/animate.ts`,
   `src/types.ts`). Depends on the offset/animating split above.
+  - Shipped (section 7.4, README "Transitions"). Final decisions:
+    - Both attribute forms: physical `{ type: 'spring', stiffness, damping, mass? }` and
+      visual `{ type: 'spring', duration, bounce? }` (bounce defaults to `0`).
+    - `bounceSize: false | spring attributes`; `false` (default) = position spring
+      critically damped, so the size never overshoots.
+    - `Motion` simplified to `current()` + `cancel()`; a retarget builds a new curve from
+      the current gap and velocity instead of `jump()`/`onSettle()`.
+    - Spring is opt-in; the global default stays easing. Untyped partial transitions are
+      easing and fall back to `DEFAULT_TRANSITION` when the global default is a spring.
+    - Gesture velocity stays internal (`createCurve(config, delta, velocity)`).
   - Model: one 1D spring per axis (x, y, width, height) on Δ:
     `m·Δ'' + c·Δ' + k·Δ = 0`, `visual = target + Δ`.
     - Offset (scroll): target only; spring untouched.

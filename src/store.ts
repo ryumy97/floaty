@@ -2,15 +2,37 @@ import { createStore } from 'zustand/vanilla';
 import { shallow } from 'zustand/vanilla/shallow';
 import type {
   FloatyChangeReason,
+  FloatyEasingTransition,
   FloatyRect,
   FloatySnapshot,
+  FloatySpringTransition,
+  FloatyTransition,
   FloatyTransitionConfig,
 } from './types';
 
-export const DEFAULT_TRANSITION: FloatyTransitionConfig = {
+export const DEFAULT_TRANSITION: FloatyEasingTransition = {
   duration: 300,
   easing: 'ease-in-out',
 };
+
+/**
+ * Resolves a `transition` value against a base config. Springs are used as
+ * given; easing objects fill missing fields from the base, or from
+ * `DEFAULT_TRANSITION` when the base is a spring.
+ */
+export function resolveTransition(
+  transition: FloatyTransition | undefined,
+  base: FloatyTransitionConfig,
+): FloatyTransitionConfig | false {
+  if (transition === false) return false;
+  if (!transition) return base;
+  if (transition.type === 'spring') return transition;
+  const easing = base.type === 'spring' ? DEFAULT_TRANSITION : base;
+  return {
+    duration: transition.duration ?? easing.duration,
+    easing: transition.easing ?? easing.easing,
+  };
+}
 
 export interface FloatyConfig {
   /** z-index of the overlay layer. Defaults to 1000. */
@@ -140,14 +162,16 @@ export function selectSnapshot(floatyId: string) {
 /** Sets global options for every `<Floaty>` and the overlay layer. */
 export function configureFloaty(
   options: Partial<Omit<FloatyConfig, 'transition'>> & {
-    transition?: Partial<FloatyTransitionConfig>;
+    transition?: Partial<FloatyEasingTransition> | FloatySpringTransition;
   },
 ) {
   floatyStore.setState((state) => ({
     config: {
       ...state.config,
       ...options,
-      transition: { ...state.config.transition, ...options.transition },
+      transition:
+        resolveTransition(options.transition, state.config.transition) ||
+        state.config.transition,
     },
   }));
 }

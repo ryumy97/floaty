@@ -5,14 +5,56 @@ export interface FloatyRect {
   height: number;
 }
 
-export interface FloatyTransitionConfig {
+export interface FloatyEasingTransition {
+  type?: 'easing';
   /** Duration in milliseconds. */
   duration: number;
   /** Any CSS easing string (`ease-in-out`, `cubic-bezier(...)`, ...). */
   easing: string;
 }
 
-export type FloatyTransition = false | Partial<FloatyTransitionConfig>;
+/** Spring defined by its physical constants. */
+export interface FloatySpringPhysics {
+  stiffness: number;
+  damping: number;
+  /** Defaults to `1`. */
+  mass?: number;
+  duration?: never;
+  bounce?: never;
+}
+
+/** Spring defined by how it looks. */
+export interface FloatySpringVisual {
+  /** Perceptual duration in milliseconds (the spring's period). */
+  duration: number;
+  /**
+   * `0` settles without overshoot, towards `1` bounces more, negative values
+   * are overdamped. Range `(-1, 1)`. Defaults to `0`.
+   */
+  bounce?: number;
+  stiffness?: never;
+  damping?: never;
+  mass?: never;
+}
+
+export type FloatySpringOptions = FloatySpringPhysics | FloatySpringVisual;
+
+export type FloatySpringTransition = FloatySpringOptions & {
+  type: 'spring';
+  /**
+   * Spring for width and height. `false` (default) uses the position spring
+   * critically damped, so the size never overshoots.
+   */
+  bounceSize?: false | FloatySpringOptions;
+};
+
+export type FloatyTransitionConfig = FloatyEasingTransition | FloatySpringTransition;
+
+/**
+ * `false` snaps. Objects without `type: 'spring'` are easing transitions and
+ * fill missing fields from the global easing default.
+ */
+export type FloatyTransition = false | Partial<FloatyEasingTransition> | FloatySpringTransition;
 
 /**
  * Why the anchor rect last changed.

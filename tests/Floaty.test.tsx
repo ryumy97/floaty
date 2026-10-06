@@ -2,6 +2,8 @@ import { act, fireEvent, render, screen } from '@testing-library/react';
 import { useEffect, useState, type ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { Floaty, FloatyAnchor, configureFloaty, useFloaty, type FloatyProps } from '../src';
+import { createCurve, deltaStyle } from '../src/animate';
+import { floatyStore } from '../src/store';
 import { animations, reducedMotion } from './setup';
 
 let mounts = 0;
@@ -50,6 +52,7 @@ function App({
 }
 
 const item = () => document.querySelector<HTMLElement>('[data-floaty="item"]')!;
+const content = () => item().querySelector<HTMLElement>('[data-floaty-content]')!;
 const layer = () => document.querySelector<HTMLElement>('[data-floaty-layer]');
 
 describe('Floaty', () => {
@@ -129,9 +132,15 @@ describe('Floaty', () => {
     const [animation] = animations;
     expect(animation.options).toEqual({ duration: 500, easing: 'linear' });
     expect(animation.keyframes).toEqual([
-      { transform: 'translate3d(10px, 20px, 0)', width: '100px', height: '50px' },
-      { transform: 'translate3d(300px, 400px, 0)', width: '200px', height: '120px' },
+      {
+        transform: 'translate3d(-290px, -380px, 0)',
+        width: 'calc(100% - 100px)',
+        height: 'calc(100% - 70px)',
+      },
+      { transform: 'translate3d(0px, 0px, 0)', width: 'calc(100% + 0px)', height: 'calc(100% + 0px)' },
     ]);
+    expect(item().style.transform).toBe('translate3d(300px, 400px, 0)');
+    expect(content().contains(screen.getByRole('button'))).toBe(true);
     expect(onTransitionStart).toHaveBeenCalledTimes(1);
     expect(onTransitionEnd).not.toHaveBeenCalled();
     expect(item().dataset.floatyState).toBe('animating');
@@ -219,7 +228,7 @@ describe('Floaty', () => {
     const { rerender } = render(<Shifting x={0} />);
     rerender(<Shifting x={80} />);
     expect(animations).toHaveLength(1);
-    expect(animations[0].keyframes[1]).toMatchObject({ transform: 'translate3d(80px, 0px, 0)' });
+    expect(animations[0].keyframes[0]).toMatchObject({ transform: 'translate3d(-80px, 0px, 0)' });
   });
 
   it('does not animate layout shifts when animateLayoutChanges is false', () => {
@@ -239,6 +248,87 @@ describe('Floaty', () => {
     expect(document.querySelector<HTMLElement>('[data-floaty="s"]')!.style.transform).toBe(
       'translate3d(80px, 0px, 0)',
     );
+  });
+});
+
+describe('retargeting', () => {
+  const easing = { transition: { duration: 500, easing: 'linear' } };
+  const spring = { transition: { type: 'spring', duration: 400, bounce: 0.3 } as const };
+  const moveAnchorB = (rect: string, reason: 'scroll' | 'layout') =>
+    act(() => {
+      screen.getByTestId('anchor-b').setAttribute('data-rect', rect);
+      floatyStore.getState().measure('item', reason);
+    });
+
+  it('scrolling mid-transition moves the target without restarting the animation', () => {
+    const { rerender } = render(<App layout="a" floatyProps={easing} />);
+    rerender(<App layout="b" floatyProps={easing} />);
+    moveAnchorB('300,350,200,120', 'scroll');
+
+    expect(animations).toHaveLength(1);
+    expect(animations[0].cancel).not.toHaveBeenCalled();
+    expect(item().style.transform).toBe('translate3d(300px, 350px, 0)');
+    expect(item().dataset.floatyState).toBe('animating');
+  });
+
+  it('easing rides along with layout shifts mid-transition', () => {
+    const { rerender } = render(<App layout="a" floatyProps={easing} />);
+    rerender(<App layout="b" floatyProps={easing} />);
+    moveAnchorB('300,350,200,120', 'layout');
+
+    expect(animations).toHaveLength(1);
+    expect(item().style.transform).toBe('translate3d(300px, 350px, 0)');
+  });
+
+  it('springs play sampled keyframes that end at rest', () => {
+    const { rerender } = render(<App layout="a" floatyProps={spring} />);
+    rerender(<App layout="b" floatyProps={spring} />);
+
+    const [animation] = animations;
+    expect(animation.options.easing).toBe('linear');
+    expect(animation.options.duration).toBeGreaterThan(0);
+    expect(animation.keyframes.length).toBeGreaterThan(2);
+    expect(animation.keyframes[0]).toEqual({
+      transform: 'translate3d(-290px, -380px, 0)',
+      width: 'calc(100% - 100px)',
+      height: 'calc(100% - 70px)',
+    });
+    expect(animation.keyframes[animation.keyframes.length - 1]).toEqual({
+      transform: 'translate3d(0px, 0px, 0)',
+      width: 'calc(100% + 0px)',
+      height: 'calc(100% + 0px)',
+    });
+  });
+
+  it('springs absorb layout shifts mid-transition into the gap', () => {
+    const { rerender } = render(<App layout="a" floatyProps={spring} />);
+    rerender(<App layout="b" floatyProps={spring} />);
+    animations[0].currentTime = 100;
+    moveAnchorB('300,350,200,120', 'layout');
+
+    expect(animations).toHaveLength(2);
+    expect(animations[0].cancel).toHaveBeenCalled();
+    const before = createCurve(spring.transition, { x: -290, y: -380, width: -100, height: -70 });
+    const gap = before.at(100).delta;
+    expect(animations[1].keyframes[0]).toEqual(
+      deltaStyle({ ...gap, y: gap.y + 50 }),
+    );
+    expect(item().dataset.floatyState).toBe('animating');
+  });
+
+  it('uses a spring set as the global default', () => {
+    configureFloaty({ transition: { type: 'spring', duration: 300 } });
+    const { rerender } = render(<App layout="a" />);
+    rerender(<App layout="b" />);
+    expect(animations[0].options.easing).toBe('linear');
+  });
+
+  it('treats a partial transition without a type as easing over a spring default', () => {
+    configureFloaty({ transition: { type: 'spring', duration: 300 } });
+    const props = { transition: { duration: 120 } };
+    const { rerender } = render(<App layout="a" floatyProps={props} />);
+    rerender(<App layout="b" floatyProps={props} />);
+    expect(animations[0].options).toEqual({ duration: 120, easing: 'ease-in-out' });
   });
 });
 
