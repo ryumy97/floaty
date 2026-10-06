@@ -70,6 +70,7 @@ Global options; can be called at any time (changes apply immediately).
 | Prop | Type | Default |
 | --- | --- | --- |
 | `floatyId` | `string` | required |
+| `children` | `ReactNode \| (state, { hasAnchor, isAnimating }) => ReactNode` | |
 | `transition` | `false \| { duration?, easing? }` | global default |
 | `keepMounted` | `boolean`: keep children mounted (hidden) while no anchor exists | `true` |
 | `animateLayoutChanges` | `boolean`: also animate when the active anchor itself moves or resizes | `true` |
@@ -80,18 +81,48 @@ The wrapper exposes `data-floaty-state="hidden" | "visible" | "animating"` for s
 
 ### `<FloatyAnchor>`
 
-Accepts all `div` props (including a native `id`) plus `floatyId`. If several anchors share
-a `floatyId`, the most recently mounted one is active; when it unmounts, the previous one
-becomes active again.
+Accepts all `div` props (including a native `id`) plus `floatyId` and an optional `state`.
+If several anchors share a `floatyId`, the most recently mounted one is active; when it
+unmounts, the previous one becomes active again.
 
 Anchors are re-measured on resize (`ResizeObserver`), window resize, any scroll, and
 whenever the anchor re-renders.
 
+### Anchor state
+
+Each anchor can pass a `state` value to the floating content, so the same component
+can render or behave differently per layout while keeping its own React state:
+
+```tsx
+function Counter() {
+  const state = useFloatyState<{ step: number; compact?: boolean }>();
+  const [count, setCount] = useState(0); // preserved across layouts
+  return <button onClick={() => setCount((c) => c + (state?.step ?? 1))}>{count}</button>;
+}
+
+<Floaty floatyId="counter"><Counter /></Floaty>
+
+<FloatyAnchor floatyId="counter" state={{ step: 1 }} />                {/* grid */}
+<FloatyAnchor floatyId="counter" state={{ step: 10, compact: true }} /> {/* sidebar */}
+```
+
+- **`useFloatyState<S>()`** reads the active anchor's state inside the content. It throws
+  if called outside `<Floaty>` content.
+- **Render-function children** pass it as props instead:
+  `<Floaty<PlayerState> floatyId="player">{(state) => <Player mode={state?.mode} />}</Floaty>`.
+- **`useFloaty<S>(floatyId).state`** reads it anywhere else.
+
+The state switches in the same commit as the anchor, so content re-renders into its new
+form while it animates to the new position. Changing the `state` prop of the active anchor
+re-renders the content without moving it. State is compared shallowly, so inline object
+literals don't cause extra renders. While no anchor exists, the last active anchor's state
+is kept.
+
 ### `useFloaty(floatyId)`
 
-Returns `{ hasAnchor, isAnimating, rect, remeasure }`. Call `remeasure()` after layout
-changes that neither resize nor re-render the anchor (for example, a CSS-only change on
-an ancestor).
+Returns `{ hasAnchor, isAnimating, rect, state, remeasure }`. Call `remeasure()` after
+layout changes that neither resize nor re-render the anchor (for example, a CSS-only change
+on an ancestor).
 
 ### Notes
 

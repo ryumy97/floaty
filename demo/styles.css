@@ -148,6 +148,19 @@ aside {
   flex-direction: column;
 }
 
+.player.mini {
+  flex-direction: row;
+  align-items: stretch;
+}
+
+.player.mini .screen {
+  align-items: center;
+}
+
+.counter.compact {
+  justify-content: space-around;
+}
+
 .screen {
   flex: 1;
   min-height: 40px;

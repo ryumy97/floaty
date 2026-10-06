@@ -27,6 +27,8 @@ export interface FloatySnapshot {
   anchor: HTMLElement | null;
   /** Last known viewport rect of the active anchor (kept after the anchor goes away). */
   rect: FloatyRect | null;
+  /** `state` prop of the active anchor (kept after the anchor goes away). */
+  state: unknown;
   reason: FloatyChangeReason;
   /** Increments whenever `anchor` or `rect` changes. */
   version: number;

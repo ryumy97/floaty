@@ -1,4 +1,5 @@
 import { createStore } from 'zustand/vanilla';
+import { shallow } from 'zustand/vanilla/shallow';
 import type {
   FloatyChangeReason,
   FloatyRect,
@@ -23,6 +24,7 @@ export interface FloatyConfig {
 export const EMPTY_SNAPSHOT: FloatySnapshot = {
   anchor: null,
   rect: null,
+  state: undefined,
   reason: 'anchor',
   version: 0,
   isAnimating: false,
@@ -35,7 +37,9 @@ interface FloatyState {
   /** Mounted anchors per floatyId; the last one is active. */
   anchors: Record<string, HTMLElement[]>;
   snapshots: Record<string, FloatySnapshot>;
-  registerAnchor(floatyId: string, el: HTMLElement): () => void;
+  registerAnchor(floatyId: string, el: HTMLElement, anchorState?: unknown): () => void;
+  /** Updates an anchor's state; reflected in the snapshot only while it is active. */
+  setAnchorState(floatyId: string, el: HTMLElement, anchorState: unknown): void;
   /** Re-measures the active anchor. No-op if its rect did not change. */
   measure(floatyId: string, reason?: FloatyChangeReason): void;
   setAnimating(floatyId: string, isAnimating: boolean): void;
@@ -51,6 +55,8 @@ export function rectsEqual(a: FloatyRect | null, b: FloatyRect | null): boolean 
   if (!a || !b) return false;
   return a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height;
 }
+
+const anchorStates = new Map<HTMLElement, unknown>();
 
 export const floatyStore = createStore<FloatyState>()((set, get) => {
   const snapshotOf = (floatyId: string) => get().snapshots[floatyId] ?? EMPTY_SNAPSHOT;
@@ -80,7 +86,12 @@ export const floatyStore = createStore<FloatyState>()((set, get) => {
     }
     patchSnapshot(
       floatyId,
-      { anchor, rect: anchor ? measureElement(anchor) : prev.rect, reason: 'anchor' },
+      {
+        anchor,
+        rect: anchor ? measureElement(anchor) : prev.rect,
+        state: anchor ? anchorStates.get(anchor) : prev.state,
+        reason: 'anchor',
+      },
       anchors,
     );
   };
@@ -90,13 +101,21 @@ export const floatyStore = createStore<FloatyState>()((set, get) => {
     anchors: {},
     snapshots: {},
 
-    registerAnchor(floatyId, el) {
+    registerAnchor(floatyId, el, anchorState) {
+      anchorStates.set(el, anchorState);
       const current = get().anchors[floatyId] ?? [];
       activate(floatyId, [...current.filter((a) => a !== el), el]);
       return () => {
         const remaining = (get().anchors[floatyId] ?? []).filter((a) => a !== el);
         activate(floatyId, remaining);
+        anchorStates.delete(el);
       };
+    },
+
+    setAnchorState(floatyId, el, anchorState) {
+      if (!anchorStates.has(el) || shallow(anchorStates.get(el), anchorState)) return;
+      anchorStates.set(el, anchorState);
+      if (snapshotOf(floatyId).anchor === el) patchSnapshot(floatyId, { state: anchorState });
     },
 
     measure(floatyId, reason = 'layout') {
@@ -135,5 +154,6 @@ export function configureFloaty(
 
 /** Restores the initial store state. Intended for tests. */
 export function resetFloaty() {
+  anchorStates.clear();
   floatyStore.setState({ config: DEFAULT_CONFIG, anchors: {}, snapshots: {} });
 }

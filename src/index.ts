@@ -1,5 +1,6 @@
 export { Floaty } from './Floaty';
-export type { FloatyProps } from './Floaty';
+export type { FloatyProps, FloatyRenderStatus } from './Floaty';
+export { useFloatyState } from './useFloatyState';
 export { FloatyAnchor } from './FloatyAnchor';
 export type { FloatyAnchorProps } from './FloatyAnchor';
 export { useFloaty } from './useFloaty';

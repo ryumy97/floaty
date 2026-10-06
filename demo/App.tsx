@@ -1,5 +1,11 @@
+import {
+  Floaty,
+  FloatyAnchor,
+  configureFloaty,
+  useFloaty,
+  useFloatyState,
+} from 'floaty-component';
 import { useEffect, useState } from 'react';
-import { Floaty, FloatyAnchor, configureFloaty, useFloaty } from 'floaty-component';
 
 configureFloaty({ transition: { easing: 'cubic-bezier(0.22, 1, 0.36, 1)' } });
 
@@ -7,20 +13,33 @@ type Layout = 'grid' | 'list' | 'sidebar' | 'hidden';
 
 const LAYOUTS: Layout[] = ['grid', 'list', 'sidebar', 'hidden'];
 
+interface CounterState {
+  label: string;
+  step: number;
+  compact?: boolean;
+}
+
+interface PlayerState {
+  mode: 'full' | 'mini';
+}
+
 function Counter() {
+  const state = useFloatyState<CounterState>();
+  const step = state?.step ?? 1;
   const [count, setCount] = useState(0);
   return (
-    <div className="card counter">
-      <strong>Counter</strong>
+    <div className={`card counter${state?.compact ? ' compact' : ''}`}>
+      {!state?.compact && <strong>{state?.label ?? 'Counter'}</strong>}
       <span className="count">{count}</span>
-      <button type="button" onClick={() => setCount((c) => c + 1)}>
-        +1
+      <button type="button" onClick={() => setCount((c) => c + step)}>
+        +{step}
       </button>
     </div>
   );
 }
 
 function Player() {
+  const mode = useFloatyState<PlayerState>()?.mode ?? 'full';
   const [elapsed, setElapsed] = useState(0);
   const [playing, setPlaying] = useState(true);
   useEffect(() => {
@@ -28,13 +47,12 @@ function Player() {
     const t = setInterval(() => setElapsed((e) => e + 1), 1000);
     return () => clearInterval(t);
   }, [playing]);
+  const time = `${Math.floor(elapsed / 60)}:${String(elapsed % 60).padStart(2, '0')}`;
   return (
-    <div className="card player">
+    <div className={`card player ${mode}`}>
       <div className="screen">
-        <span>{playing ? 'Playing' : 'Paused'}</span>
-        <span className="time">
-          {Math.floor(elapsed / 60)}:{String(elapsed % 60).padStart(2, '0')}
-        </span>
+        {mode === 'full' && <span>{playing ? 'Playing' : 'Paused'}</span>}
+        <span className="time">{time}</span>
       </div>
       <button type="button" onClick={() => setPlaying((p) => !p)}>
         {playing ? 'Pause' : 'Play'}
@@ -44,11 +62,12 @@ function Player() {
 }
 
 function Status() {
-  const player = useFloaty('player');
+  const player = useFloaty<PlayerState>('player');
+  const counter = useFloaty<CounterState>('counter');
   return (
     <p className="status">
-      player: {player.hasAnchor ? 'anchored' : 'no anchor'}
-      {player.isAnimating ? ' (animating)' : ''}
+      player: {player.hasAnchor ? player.state?.mode : 'no anchor'}
+      {player.isAnimating ? ' (animating)' : ''} | counter step: {counter.state?.step ?? '-'}
     </p>
   );
 }
@@ -62,8 +81,12 @@ function Content({ layout }: { layout: Layout }) {
     case 'grid':
       return (
         <div className="grid">
-          <FloatyAnchor floatyId="player" className="anchor big" />
-          <FloatyAnchor floatyId="counter" className="anchor" />
+          <FloatyAnchor floatyId="player" className="anchor big" state={{ mode: 'full' }} />
+          <FloatyAnchor
+            floatyId="counter"
+            className="anchor"
+            state={{ label: 'Grid counter', step: 1 }}
+          />
           <Placeholder label="Item" />
           <Placeholder label="Item" />
           <Placeholder label="Item" />
@@ -73,9 +96,13 @@ function Content({ layout }: { layout: Layout }) {
       return (
         <div className="list">
           <Placeholder label="Row" />
-          <FloatyAnchor floatyId="counter" className="anchor row" />
+          <FloatyAnchor
+            floatyId="counter"
+            className="anchor row"
+            state={{ label: 'List counter (x10)', step: 10 }}
+          />
           <Placeholder label="Row" />
-          <FloatyAnchor floatyId="player" className="anchor row tall" />
+          <FloatyAnchor floatyId="player" className="anchor row tall" state={{ mode: 'full' }} />
           <Placeholder label="Row" />
         </div>
       );
@@ -83,8 +110,12 @@ function Content({ layout }: { layout: Layout }) {
       return (
         <div className="with-sidebar">
           <aside>
-            <FloatyAnchor floatyId="player" className="anchor mini" />
-            <FloatyAnchor floatyId="counter" className="anchor mini" />
+            <FloatyAnchor floatyId="player" className="anchor mini" state={{ mode: 'mini' }} />
+            <FloatyAnchor
+              floatyId="counter"
+              className="anchor mini"
+              state={{ label: 'Sidebar', step: 1, compact: true }}
+            />
           </aside>
           <main>
             <Placeholder label="Main content" />

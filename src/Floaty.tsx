@@ -1,16 +1,26 @@
-import { useRef, type CSSProperties, type ReactNode } from 'react';
+import { useMemo, useRef, type CSSProperties, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useStore } from 'zustand';
 import { animateRect, applyRect, prefersReducedMotion, type RectAnimation } from './animate';
 import { useFloatyLayer } from './layer';
 import { floatyStore, measureElement, rectsEqual, selectSnapshot } from './store';
 import type { FloatyRect, FloatyTransition, FloatyTransitionConfig } from './types';
+import { FloatyContentContext } from './useFloatyState';
 import { useIsomorphicLayoutEffect } from './utils';
 
-export interface FloatyProps {
+export interface FloatyRenderStatus {
+  hasAnchor: boolean;
+  isAnimating: boolean;
+}
+
+export interface FloatyProps<S = unknown> {
   /** Matches the `floatyId` of one or more `<FloatyAnchor>`s. */
   floatyId: string;
-  children?: ReactNode;
+  /**
+   * Content to float. Pass a function to render from the active anchor's
+   * `state`; the returned tree keeps its React state across anchor switches.
+   */
+  children?: ReactNode | ((state: S | undefined, status: FloatyRenderStatus) => ReactNode);
   /**
    * `false` snaps to the new anchor instantly. An object overrides the
    * global default `{ duration, easing }` set with `configureFloaty`.
@@ -34,7 +44,7 @@ export interface FloatyProps {
  * active `<FloatyAnchor>` with the same `floatyId`. Place it somewhere that
  * stays mounted across layout changes so its children keep their state.
  */
-export function Floaty({
+export function Floaty<S = unknown>({
   floatyId,
   children,
   transition,
@@ -44,7 +54,7 @@ export function Floaty({
   style,
   onTransitionStart,
   onTransitionEnd,
-}: FloatyProps) {
+}: FloatyProps<S>) {
   const layer = useFloatyLayer();
   const snapshot = useStore(floatyStore, selectSnapshot(floatyId));
   const defaults = useStore(floatyStore, (state) => state.config.transition);
@@ -141,8 +151,21 @@ export function Floaty({
     [floatyId],
   );
 
+  const contentContext = useMemo(
+    () => ({ floatyId, state: snapshot.state }),
+    [floatyId, snapshot.state],
+  );
+
   if (!layer) return null;
   if (!keepMounted && !snapshot.anchor) return null;
+
+  const content =
+    typeof children === 'function'
+      ? children(snapshot.state as S | undefined, {
+          hasAnchor: snapshot.anchor !== null,
+          isAnimating: snapshot.isAnimating,
+        })
+      : children;
 
   return createPortal(
     <div
@@ -159,7 +182,7 @@ export function Floaty({
         ...style,
       }}
     >
-      {children}
+      <FloatyContentContext.Provider value={contentContext}>{content}</FloatyContentContext.Provider>
     </div>,
     layer,
   );

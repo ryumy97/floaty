@@ -96,7 +96,8 @@ src/
   Floaty.tsx         Content component: portal, positioning, animation decisions
   FloatyAnchor.tsx   Placeholder component: registration, active-state subscription
   useRectTracker.ts  Measurement triggers for the active anchor (resize, scroll, RO)
-  useFloaty.ts       Read-only status hook + remeasure()
+  useFloaty.ts       Read-only status hook (incl. anchor state) + remeasure()
+  useFloatyState.ts  Content context + useFloatyState() for reading anchor state inside content
   animate.ts         FLIP animation (Web Animations API + rAF fallback), easing
   utils.ts           useIsomorphicLayoutEffect
 ```
@@ -112,6 +113,8 @@ flowchart TD
   Floaty --> layer
   Floaty --> store
   Floaty --> animate
+  Floaty --> useFloatyState
+  index --> useFloatyState
   FloatyAnchor --> store
   FloatyAnchor --> useRectTracker
   useRectTracker --> store
@@ -133,11 +136,16 @@ interface FloatyState {
   config: FloatyConfig;                         // zIndex, transition, layerClassName
   anchors: Record<string, HTMLElement[]>;       // mounted anchors per floatyId; last = active
   snapshots: Record<string, FloatySnapshot>;    // derived, immutable per floatyId
-  registerAnchor(floatyId, el): () => void;     // returns unregister
+  registerAnchor(floatyId, el, state?): () => void;  // returns unregister
+  setAnchorState(floatyId, el, state): void;    // shallow-compared; mirrored only if el is active
   measure(floatyId, reason?): void;             // re-measure active anchor; no-op if unchanged
   setAnimating(floatyId, isAnimating): void;
 }
 ```
+
+Per-anchor `state` values live in a module-level `Map<HTMLElement, unknown>` next to the
+store, not in store state. Only the **active** anchor's state is mirrored into the snapshot,
+so state changes on inactive anchors never notify subscribers.
 
 ### 5.2 Snapshot
 
@@ -145,6 +153,7 @@ interface FloatyState {
 interface FloatySnapshot {
   anchor: HTMLElement | null;   // active anchor element
   rect: FloatyRect | null;      // last known viewport rect; kept after the anchor goes away
+  state: unknown;               // active anchor's `state` prop; kept after the anchor goes away
   reason: 'anchor' | 'layout' | 'scroll';
   version: number;              // bumped only when anchor or rect changes
   isAnimating: boolean;
@@ -159,6 +168,7 @@ Design notes:
 - **`version` is the positioning signal.** `Floaty`'s positioning effect depends on
   `version` and `anchor`, not on the whole snapshot. Toggling `isAnimating` does not bump
   `version`, so reporting animation status never re-triggers positioning (no feedback loop).
+  The same applies to `state`: changing it re-renders content but never repositions it.
 - **`rect` survives anchor removal.** It records where the content last was, which is
   useful for `useFloaty` consumers. When content is hidden and later re-anchored, it snaps
   rather than animating from a stale position.
@@ -169,8 +179,9 @@ Design notes:
 
 | Operation | Effect |
 | --- | --- |
-| `registerAnchor(id, el)` | Moves `el` to the top of `anchors[id]`; if the active anchor changed, measures it and sets `reason: 'anchor'`, `version++` |
-| unregister (returned fn) | Removes `el`; if it was active, activates the next anchor (or `null`, keeping `rect`) |
+| `registerAnchor(id, el, state)` | Records `state`, moves `el` to the top of `anchors[id]`; if the active anchor changed, measures it, copies its `state`, sets `reason: 'anchor'`, `version++` |
+| unregister (returned fn) | Removes `el` and its state; if it was active, activates the next anchor (or `null`, keeping `rect` and `state`) |
+| `setAnchorState(id, el, state)` | No-op if shallow-equal; otherwise records it and, if `el` is active, patches `snapshot.state` without bumping `version` |
 | `measure(id, reason)` | Reads `getBoundingClientRect()` of the active anchor; updates only if the rect differs |
 | `setAnimating(id, b)` | Updates `isAnimating` without bumping `version` |
 | `configureFloaty(opts)` | Shallow-merges config (deep-merges `transition`) |
@@ -181,13 +192,16 @@ Design notes:
 ### 6.1 `FloatyAnchor`
 
 1. Holds its element in a **ref** (not state), merged with any forwarded ref.
-2. In a **layout effect** keyed on `floatyId`, calls `registerAnchor`; the cleanup
+2. In a **layout effect** keyed on `floatyId`, calls `registerAnchor` with the current
+   `state` (read from a ref so registration does not re-run on state changes); the cleanup
    unregisters.
-3. Subscribes to a boolean selector: "am I the active anchor for this id?"
-4. While active, `useRectTracker` keeps the rect fresh.
-5. A dependency-free layout effect calls `measure(id, 'layout')` after every render while
+3. A second layout effect keyed on `state` calls `setAnchorState`. The store compares it
+   shallowly, so passing `state={{ ... }}` inline is cheap.
+4. Subscribes to a boolean selector: "am I the active anchor for this id?"
+5. While active, `useRectTracker` keeps the rect fresh.
+6. A dependency-free layout effect calls `measure(id, 'layout')` after every render while
    active, catching moves caused by parent re-renders that don't resize the anchor.
-6. Spreads remaining props onto the `div`, so a native `id`, `className`, `style`, ARIA
+7. Spreads remaining props onto the `div`, so a native `id`, `className`, `style`, ARIA
    attributes and so on all work.
 
 ### 6.2 `useRectTracker`
@@ -224,7 +238,35 @@ own the element during transitions. React only controls the static styles; user 
 is merged in and should avoid `transform`, `width` and `height`.
 
 Rendering `Floaty` on scroll does not re-render `children`: the `children` element identity
-is unchanged, so React bails out of that subtree.
+is unchanged and the content context value is memoized on `state`, so React bails out of
+that subtree. (Render-function children are called on every `Floaty` render; keep them
+cheap or memoize inside.)
+
+### 6.4 Anchor state flow
+
+Anchor state lets one stateful component adapt per layout (for example, a full player in
+the grid and a mini player in the sidebar) without remounting.
+
+```mermaid
+flowchart LR
+  AnchorProp["FloatyAnchor state prop"] -->|"register / setAnchorState"| StateMap[("anchor state map")]
+  StateMap -->|"active anchor only"| Snap["snapshot.state"]
+  Snap --> Ctx["FloatyContentContext"]
+  Snap --> RenderFn["render-function children"]
+  Snap --> Hook["useFloaty(id).state"]
+  Ctx --> UseState["useFloatyState() in content"]
+```
+
+- `Floaty` provides `FloatyContentContext` (`{ floatyId, state }`) around its content, so any
+  descendant can call `useFloatyState()`. Because context crosses portals, this works even
+  though the content lives in the overlay layer.
+- On an anchor switch, the new anchor's state is copied into the snapshot **in the same store
+  update** that changes `anchor` (section 9). Content therefore re-renders into its new form
+  in the same frame the FLIP animation starts, and the animation shows the content morphing
+  as it moves.
+- Because only element types and positions decide whether React keeps component state,
+  content keeps its hooks and state across state changes. Effects that depend on state
+  values re-run, which is the intended way to "change logic" per layout.
 
 ## 7. Positioning and animation
 
@@ -443,6 +485,10 @@ Coverage by behavior:
 - Anchor stack: most recent wins, fallback on unmount.
 - Same-anchor layout shifts, with `animateLayoutChanges` on and off.
 - Native `id` passthrough on anchors; `useFloaty` status transitions.
+- Anchor state (`tests/state.test.tsx`): exposure through `useFloatyState`, render functions
+  and `useFloaty`; switching with the anchor while keeping component state and re-running
+  effects; updates without repositioning; shallow equality (no extra renders); inactive
+  anchors ignored; last state kept with no anchor.
 - Unit tests for the easing solver and the store's change detection.
 
 Not covered by unit tests (verified manually in `demo/`): real browser layout, actual Web
