@@ -10,9 +10,9 @@ import { useEffect, useState } from 'react';
 
 configureFloaty({ transition: { easing: 'cubic-bezier(0.22, 1, 0.36, 1)' } });
 
-type Layout = 'grid' | 'list' | 'sidebar' | 'hidden';
+type Layout = 'grid' | 'list' | 'sidebar' | 'dock' | 'scroll box' | 'deferred' | 'hidden';
 
-const LAYOUTS: Layout[] = ['grid', 'list', 'sidebar', 'hidden'];
+const LAYOUTS: Layout[] = ['grid', 'list', 'sidebar', 'dock', 'scroll box', 'deferred', 'hidden'];
 
 interface CounterState {
   label: string;
@@ -131,9 +131,59 @@ function Content({ layout }: { layout: Layout }) {
           </main>
         </div>
       );
+    case 'dock':
+      return (
+        <div className="list">
+          <FloatyAnchor
+            floatyId="counter"
+            className="anchor row"
+            state={{ label: 'Page counter', step: 1 }}
+          />
+          <Placeholders label="Row" count={14} />
+          <div className="dock">
+            <FloatyAnchor floatyId="player" className="anchor mini" state={{ mode: 'mini' }} />
+          </div>
+        </div>
+      );
+    case 'scroll box':
+      return (
+        <div className="scroll-box" data-testid="scroll-box">
+          <Placeholders label="Box item" count={3} />
+          <FloatyAnchor floatyId="player" className="anchor row tall" state={{ mode: 'full' }} />
+          <Placeholders label="Box item" count={2} from={4} />
+          <FloatyAnchor
+            floatyId="counter"
+            className="anchor row"
+            state={{ label: 'Scroll box counter', step: 1 }}
+          />
+          <Placeholders label="Box item" count={6} from={6} />
+        </div>
+      );
+    case 'deferred':
+      return <Deferred />;
     case 'hidden':
       return <Placeholder label="No anchors here: floaties are hidden but keep their state." />;
   }
+}
+
+/** Mounts its anchor one commit after the layout, like a lazy route or Suspense boundary. */
+function Deferred() {
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => setReady(true), 50);
+    return () => clearTimeout(timer);
+  }, []);
+  return (
+    <div className="list">
+      <Placeholder label="Deferred layout: the player anchor mounts after 50ms" />
+      {ready ? (
+        <FloatyAnchor floatyId="player" className="anchor row tall" state={{ mode: 'full' }} />
+      ) : (
+        <Placeholder label="Loading..." />
+      )}
+      <Placeholders label="Row" count={4} />
+    </div>
+  );
 }
 
 export function App() {

@@ -288,10 +288,30 @@ flowchart LR
 ### 7.1 Coordinate system
 
 - The store keeps **viewport** rects (`getBoundingClientRect()`).
-- The layer is `position: fixed; inset: 0`, so its origin normally equals the viewport
-  origin. `Floaty` still subtracts the layer's own rect (`relativeTo(rect, layerRect)`) so
-  positioning stays correct if the layer is offset (for example, by a transformed ancestor
-  or custom layer styling).
+- The layer is `position: absolute` at the **document origin** (`top: 0; left: 0`, zero
+  size, `overflow: visible`). Each floaty's outer element uses one of two placements,
+  chosen per active anchor:
+
+| Placement | When | Outer element | Target |
+| --- | --- | --- | --- |
+| Document | default | `position: absolute` inside the layer | `relativeTo(anchorRect, layerRect)`: anchor minus layer origin, i.e. document coordinates |
+| Fixed | the anchor or an ancestor has computed `position: fixed` | `position: fixed` | the anchor's viewport rect |
+
+- **Why:** browsers scroll the page on the compositor thread, ahead of JavaScript. With
+  document placement the page scroll moves the layer and the anchor equally, so the
+  target does not change and the content scrolls natively in the same frame as the page.
+  Anchors in fixed containers do not move with the page, so their floaties are fixed too.
+  JavaScript re-measurement is only needed when the anchor moves *relative to its
+  placement*: nested scroll containers, sticky anchors while stuck, layout shifts.
+- The placement is re-evaluated (an ancestor walk with `getComputedStyle`) when the anchor
+  changes or on `layout` measurements, never on scroll. Switching placement only changes
+  the outer element's CSS `position`, so no DOM node moves and iframe/video state is kept.
+- Gaps between placements are computed in viewport space: each target is converted with
+  `toViewport` (document targets add the current layer origin) before
+  `Δ += prev − next`, so switching between a fixed and a page anchor after scrolling
+  animates the on-screen distance.
+- `Floaty` skips the style write when the target and placement are unchanged (the common
+  case on page scroll).
 - The outer element is placed with `translate3d(x, y, 0)` plus explicit `width` and
   `height`. The transform keeps movement on the compositor; the size change is a layout of
   the content only, which keeps it simple and accurate (no scale distortion of text or
@@ -350,8 +370,10 @@ Key properties:
   and the inner element's resting styles (`100%` size, no transform) are static. Animations
   use `fill: none`, so cancelling or finishing leaves the box exactly on the target.
 - **Lifecycle callbacks** fire once per continuous transition: `onTransitionStart` when
-  movement begins from rest, `onTransitionEnd` when it finishes or is resolved by a snap.
-  Retargeting mid-flight does not re-fire `onTransitionStart`.
+  movement begins from rest, `onTransitionEnd` when it finishes, is resolved by a snap, or
+  is cancelled because the anchor went away (so start and end always pair up). Retargeting
+  mid-flight does not re-fire `onTransitionStart`. Unmounting `Floaty` mid-flight cancels
+  the animation and clears `isAnimating` without calling `onTransitionEnd`.
 
 ### 7.3 Animate-or-snap decision
 
@@ -368,8 +390,9 @@ Everything else only updates the offset:
 
 - **First placement**: there was no previous anchor (initial mount, or re-anchoring after a
   period with no anchor). Flying in from an invisible, stale position would look wrong.
-- **Scroll**, at rest or mid-flight: the box follows the page instantly; a running
-  transition continues toward the moving target.
+- **Scroll**, at rest or mid-flight: page scroll moves the box natively (section 7.1);
+  nested-container scroll updates the target; a running transition continues toward the
+  moving target either way.
 - **Layout shift mid-flight with easing**: the box jumps with the anchor, like scroll.
   Easing has no velocity to carry, so restarting it would visibly stall; springs absorb
   the shift instead.
@@ -420,7 +443,8 @@ transitions whose missing fields come from the base when it is an easing, or fro
 ## 8. Overlay layer lifecycle (`src/layer.ts`)
 
 - A single `div[data-floaty-layer]` is appended to `document.body`, styled
-  `position: fixed; inset: 0; pointer-events: none`. Each floaty's outer element also has
+  `position: absolute; top: 0; left: 0; width: 0; height: 0; pointer-events: none` (the
+  document origin, section 7.1). Each floaty's outer element also has
   `pointer-events: none` and its inner (visible) element sets `pointer-events: auto`, so
   only the visible content captures input, including mid-transition.
 - **Ref-counted.** Each mounted `Floaty` acquires the layer in a layout effect and releases
@@ -484,7 +508,7 @@ swap" cover it.
 | Concern | Approach |
 | --- | --- |
 | Re-render scope | Per-`floatyId` selectors; anchors subscribe to a boolean (`isActive`) only |
-| Scroll cost | One rAF-coalesced `getBoundingClientRect()` per active anchor per frame; updates skipped when the rect is unchanged |
+| Scroll cost | Page scroll is native (no JS needed for alignment). The tracker still does one rAF-coalesced `getBoundingClientRect()` per active anchor per frame to keep `useFloaty().rect` current; `Floaty` skips the style write when the document target is unchanged |
 | Children re-renders | `children` identity is stable, so `Floaty` re-renders never re-render content |
 | Style writes | Imperative writes to the outer element (`transform`, `width`, `height`, `visibility`, `data-floaty-state`); no React style diffing on hot paths |
 | Animation | Compositor-friendly `transform`; `width`/`height` animate layout of the content only. Scrolls never restart or re-measure a running animation |
@@ -511,7 +535,10 @@ heavy content, a future `sizeMode: 'scale'` option could animate `scale` instead
 | Limitation | Explanation / mitigation |
 | --- | --- |
 | Global namespace | One store per JS module instance: all React roots share `floatyId`s. Use distinct ids per micro-frontend. |
-| Not clipped by scroll containers | Content lives in a fixed overlay, so it can visually escape `overflow: hidden` ancestors of the anchor while they scroll. Use `useFloaty().rect` to implement custom clipping or hide when out of view. |
+| Not clipped by scroll containers | Content lives in a body-level overlay, so it can visually escape `overflow: hidden` ancestors of the anchor while they scroll. Use `useFloaty().rect` to implement custom clipping or hide when out of view. |
+| JS-tracked cases can lag a frame | Nested scroll containers and sticky anchors while stuck move relative to the floaty's placement, so they still follow via a rAF re-measure, which can trail compositor scrolling by a frame. Page scroll and fixed containers are native. |
+| Document scroll area | Floaties are absolutely positioned in the document, so one placed beyond the document's end (for example, over an anchor scrolled out of a nested container near the bottom of the page, or overshooting with a spring) can extend the page's scrollable area while it is there. |
+| Transformed `html`/`body` | A `transform`, `filter` or `contain` on `html` or `body` makes them the containing block for fixed elements, so fixed placement would be offset. |
 | Undetectable moves | A position change with no resize, scroll or re-render of the anchor (for example, a CSS-only change on an ancestor) is not observed. Call `useFloaty(id).remeasure()`. |
 | Stacking context | All floaties share the layer's `zIndex`; they cannot interleave with page elements at different z-levels. Order among floaties follows mount order. |
 | Content not in server HTML | See section 11. |
@@ -540,7 +567,8 @@ heavy content, a future `sizeMode: 'scale'` option could animate `scale` instead
 
 ## 15. Testing strategy
 
-Stack: Vitest, React Testing Library and jsdom (`vitest.config.ts`, `tests/setup.ts`).
+Stack: Vitest, React Testing Library and jsdom (`vitest.config.ts`, `tests/setup.ts`) for
+unit and component tests; Playwright against the demo for end-to-end tests (`e2e/`).
 
 jsdom has no layout engine, so the setup installs deterministic fakes:
 
@@ -548,7 +576,9 @@ jsdom has no layout engine, so the setup installs deterministic fakes:
 | --- | --- |
 | `HTMLElement.prototype.getBoundingClientRect` | Returns the rect from a `data-rect="x,y,w,h"` attribute, otherwise derives it from inline `translate3d`/`width`/`height` |
 | `HTMLElement.prototype.animate` | Records keyframes and options; `currentTime` is settable to simulate progress; `finish()` completes an animation on demand |
-| `ResizeObserver` | No-op stub |
+| `ResizeObserver` | Records observed elements; `triggerResize(el)` fires the observers watching `el` |
+| `requestAnimationFrame` / `cancelAnimationFrame` | Manual queue; `flushFrames(time?)` runs queued callbacks once, `pendingFrames()` counts them |
+| `parseDelta(keyframe)` | Helper that turns gap keyframes back into numbers |
 | `window.matchMedia` | Reduced motion controllable through `reducedMotion.value` |
 | Store | `resetFloaty()` before each test for isolation |
 
@@ -577,10 +607,42 @@ Coverage by behavior:
   `bounceSize`, all three damping regimes start at the initial state and settle, resuming
   from a sampled state matches the uninterrupted solution, overshoot only when
   underdamped, size never overshoots by default, velocity carried into a retargeted curve.
+- Rect tracking (`tests/tracking.test.tsx`): window scroll, nested container scroll
+  (capture phase), window resize (`scroll`) and anchor resize (`layout`); one measurement
+  per frame with `layout` winning; only the active anchor is observed; listeners and
+  pending frames are dropped on deactivate and unmount; `useFloaty().remeasure()`.
+- Transition lifecycle (`tests/lifecycle.test.tsx`): anchor switch mid-flight (easing
+  restarts from the current gap, springs carry velocity, one start/end pair); anchor
+  disappearing, snapping (`transition={false}`, reduced motion) and unmounting mid-flight;
+  StrictMode (single layer, anchor stack, animation); one ref-counted layer across several
+  `Floaty`s; `bounceSize` with its own spring.
+- Coordinates (`tests/coordinates.test.tsx`): absolute layer at the document origin;
+  page anchors in document coordinates (unchanged target after page scroll); anchors in
+  fixed containers use fixed placement and viewport coordinates; switching between them
+  after scrolling animates the on-screen gap.
+- rAF fallback (`tests/fallback.test.ts`): per-frame gap styles for easing and springs,
+  resting styles restored on finish and cancel, no `onFinish` after cancel.
 
-Not covered by unit tests (verified manually in `demo/`): real browser layout, actual Web
-Animations API rendering, scroll tracking with real scroll containers. A future Playwright
-suite against the demo would close this gap.
+**End-to-end (`e2e/`, Playwright, Chromium).** `playwright.config.ts` starts the demo
+(`pnpm dev`, port 5199) and the tests drive its layout buttons and transition controls.
+Alignment is checked by comparing the inner box's `getBoundingClientRect()` with the
+active anchor's (within 1 px), and running transitions through `element.getAnimations()`.
+
+- Rest alignment, component state kept across layouts, layout shift from a viewport
+  resize (real `ResizeObserver`).
+- Easing animates the gap and lands on the anchor; springs play sampled `linear`
+  keyframes and land exactly (verifies the `calc(100% ± Δ)` keyframes render).
+- Page scroll at rest, nested scroll container (demo `scroll box` layout), sticky sidebar
+  anchors; scrolling mid-transition keeps the same `Animation` object running.
+- Known issue, marked `test.fail`: the demo's `deferred` layout mounts its anchor one commit
+  late, and the content snaps instead of animating (section 9).
+
+- Native scrolling: alignment is checked in the same task as `window.scrollBy`, before any
+  rAF or re-measure, for page anchors (document placement, outer transform unchanged
+  afterwards) and for anchors in the demo's fixed `dock`; animating between page and fixed
+  anchors after scrolling.
+
+Not covered yet: WebKit and Firefox, frame-level smoothness of the JS-tracked cases.
 
 ## 16. Build and packaging
 
@@ -669,3 +731,18 @@ suite against the demo would close this gap.
 - **Consequence:** two DOM elements per floaty (`data-floaty` and `data-floaty-content`).
   With easing, a layout shift mid-flight jumps with the anchor instead of being animated;
   springs absorb it smoothly.
+
+### ADR-8: Document-coordinate layer with per-floaty fixed placement
+
+- **Decision:** make the overlay layer `position: absolute` at the document origin instead
+  of `position: fixed`, and give each floaty's outer element `position: fixed` (viewport
+  coordinates) only while its anchor is inside a fixed container.
+- **Why:** with a fixed layer every page scroll had to be followed from JavaScript, which
+  trails the compositor-driven scroll by a frame (visible lag and jitter, especially with
+  momentum scrolling on mobile and trackpads). In document coordinates, page scroll moves
+  the content natively. A floaty can never move between layers (moving DOM would reload
+  iframes and interrupt media), so the placement is switched with CSS on the outer element
+  instead.
+- **Consequence:** nested scroll containers and stuck sticky anchors are still followed
+  from JavaScript; floaties beyond the document's end can extend the scrollable area; a
+  transformed `html`/`body` breaks fixed placement (section 12).

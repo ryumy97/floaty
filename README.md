@@ -12,7 +12,7 @@ Peer dependencies: `react` and `react-dom` (>= 18). State is shared through a si
 For a detailed design write-up (state model, commit-phase timing, animation model,
 trade-offs, and decision records), see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
-- `<Floaty floatyId="x">` renders its children once, into a fixed overlay layer that is
+- `<Floaty floatyId="x">` renders its children once, into an overlay layer that is
   appended to `document.body` on first use (and removed when the last `Floaty` unmounts).
   Place it somewhere that stays mounted when the layout changes, and its children keep
   their state.
@@ -22,6 +22,10 @@ trade-offs, and decision records), see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.
   animates from its old rect to the new one (FLIP, via the Web Animations API) with an
   easing curve or a spring, or snaps if transitions are disabled or the user prefers
   reduced motion. Scrolling during a transition never restarts it.
+- Content is positioned in document coordinates, so page scrolling moves it natively in
+  the same frame as the page. Anchors inside `position: fixed` containers get fixed
+  positioning instead. Only nested scroll containers and stuck sticky anchors need a
+  JavaScript re-measure.
 
 ## Usage
 
@@ -165,6 +169,7 @@ the client), and anchors only register in the browser.
 pnpm install
 pnpm dev          # demo playground (demo/)
 pnpm test         # vitest + React Testing Library
+pnpm test:e2e     # Playwright against the demo (first run: pnpm exec playwright install chromium)
 pnpm typecheck
 pnpm build        # dist/ (ESM + CJS + .d.ts)
 ```

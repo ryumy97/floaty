@@ -5,94 +5,6 @@ Findings from the architecture review of `docs/ARCHITECTURE.md` against `src/`. 
 
 ## High priority
 
-- [x] **Retargeting restarts the easing curve** (`src/Floaty.tsx`, positioning effect)
-  - Shipped (ADR-7, section 7.2). Deviations from the plan below: the anchor-switch gap is
-    computed from the last target and the running curve instead of measuring the inner
-    element, so `tests/setup.ts` needed no composed-rect fake.
-  - Scroll mid-transition starts a new `ease-in-out` animation every frame (near-zero
-    initial velocity), so content crawls while scrolling and catches up afterwards.
-  - Continuous `layout` reasons (window drag-resize, CSS-transitioned anchor size) start a
-    fresh full-duration animation every frame, so content trails far behind.
-  - Approach: split every change into an **offset** and an **animating** part.
-    `visual = target + Δ · (1 - ease(p))`, where the target (offset) is written directly
-    and only Δ (the gap to the target when a transition starts) is eased to 0 on its own clock.
-
-    | Event | Offset (outer) | Animating Δ (inner) |
-    | --- | --- | --- |
-    | Scroll, at rest or mid-flight | update | untouched |
-    | Anchor switch | update | measure inner's visual rect, start new Δ |
-    | Layout shift at rest (`animateLayoutChanges`) | update | start Δ = old target - new target |
-    | Layout shift mid-flight | update | untouched |
-    | First placement, `transition={false}`, reduced motion | update | none |
-
-  - Removes the `scrolledMidAnimation` branch and `RectAnimation.remaining()`, and the
-    per-frame `getBoundingClientRect()` read while scrolling mid-flight.
-  - Decisions:
-    1. **Layout shift mid-flight rides along as offset.** The content jumps with the anchor,
-       exactly like scroll. Accepted for the easing driver; additive per-change Δ stacking is
-       not pursued, because the spring driver (below) absorbs mid-flight shifts into Δ while
-       keeping velocity.
-    2. **DOM structure: outer + inner wrapper.**
-       - Outer (`data-floaty`, `data-floaty-state`, `aria-hidden`, `visibility`):
-         `position: absolute; top: 0; left: 0`, imperative `transform: translate3d(target)`,
-         `width`/`height` = target, `pointer-events: none`. Never animated.
-       - Inner (visible box): receives user `className` and `style`, `pointer-events: auto`,
-         `box-sizing: border-box`, rests at `width: 100%; height: 100%`. Runs the Δ animation:
-         `{ transform: translate(dx, dy), width: calc(100% + dw), height: calc(100% + dh) }`
-         to `{ transform: none, width: 100%, height: 100% }`, `fill: none`.
-       - `tests/setup.ts`: the `getBoundingClientRect` fake must compose the outer rect with
-         the inner's inline/animated delta; update tests that read `[data-floaty]` styles.
-    3. **No-WAAPI fallback uses the same split.** The outer is written the same way in both
-       paths; the `requestAnimationFrame` fallback writes the inner's Δ styles each frame and
-       never touches the outer, so scroll offsets apply even mid-flight.
-
-- [x] **Spring animation (damped harmonic oscillator)** (new `src/spring.ts`, `src/animate.ts`,
-  `src/types.ts`). Depends on the offset/animating split above.
-  - Shipped (section 7.4, README "Transitions"). Final decisions:
-    - Both attribute forms: physical `{ type: 'spring', stiffness, damping, mass? }` and
-      visual `{ type: 'spring', duration, bounce? }` (bounce defaults to `0`).
-    - `bounceSize: false | spring attributes`; `false` (default) = position spring
-      critically damped, so the size never overshoots.
-    - `Motion` simplified to `current()` + `cancel()`; a retarget builds a new curve from
-      the current gap and velocity instead of `jump()`/`onSettle()`.
-    - Spring is opt-in; the global default stays easing. Untyped partial transitions are
-      easing and fall back to `DEFAULT_TRANSITION` when the global default is a spring.
-    - Gesture velocity stays internal (`createCurve(config, delta, velocity)`).
-  - Model: one 1D spring per axis (x, y, width, height) on Δ:
-    `m·Δ'' + c·Δ' + k·Δ = 0`, `visual = target + Δ`.
-    - Offset (scroll): target only; spring untouched.
-    - Retarget (anchor switch, layout shift mid-flight): `Δ += oldTarget - newTarget`,
-      velocity kept, so momentum carries through interruptions.
-  - Solver: closed-form `springAt(params, { delta, velocity }, t)` for underdamped,
-    critically damped and overdamped cases, plus `settleTime(...)` (|Δ| and |v| below ~0.5px).
-    Analytic state means retargets need no layout read: `visual = oldTarget + Δ(t)`.
-  - Drivers:
-    - WAAPI: on start/retarget, sample `springAt` at ~60 Hz up to the slowest axis's settle
-      time into keyframes on the inner element, `easing: 'linear'`. Sample keyframes rather
-      than a CSS `linear()` easing, because after a retarget each axis has its own Δ/v ratio.
-    - rAF fallback: evaluate `springAt` per frame and write the inner's Δ styles.
-  - Unify easing and spring behind one `Motion` interface:
-    `start(delta, velocity?)`, `jump(deltaChange)`, `current()`, `cancel()`, `onSettle(cb)`.
-    Easing ignores velocity. Make the easing driver's "current Δ" analytic too.
-  - API: `transition: { type: 'spring', duration, bounce }` (perceptual default;
-    `ω0 = 2π / duration`, `ζ = 1 - bounce`) or `{ type: 'spring', stiffness, damping, mass }`.
-    Same shape for `configureFloaty`; `transition={false}` and reduced motion still snap.
-  - Open decisions:
-    - Bounce on size: option to keep width/height critically damped (position-only bounce),
-      possibly as the default. Negative sizes clamp via `calc(100% + Δ)`.
-    - `isAnimating` / `onTransitionEnd` fire at settle; retargets extend the transition.
-    - Keep `start(delta, velocity)` open for future gesture "throw" velocity.
-  - Docs: rewrite ADR-4 (springs now supported) and section 7 around the motion driver.
-  - Order: (1) offset/animating split with easing, (2) `Motion` interface + analytic Δ,
-    (3) `spring.ts` with unit tests, spring driver, `transition` API.
-
-- [ ] **Fixed-layer scroll lag** (`src/layer.ts`, `src/useRectTracker.ts`)
-  - Scrolling is composited off the main thread; JS-driven following can lag a frame or
-    jitter (mobile, trackpad momentum). Section 7.3's "instantaneous" claim is optimistic.
-  - Proposed: when the anchor's only scroller is the document, position in page coordinates
-    (absolute layer) so native scrolling moves the content; JS tracking only for nested
-    scroll containers.
-
 - [ ] **Undetected moves from sibling layout changes** (`src/useRectTracker.ts`)
   - An image or async content above the anchor moves it without resize, scroll or re-render.
   - Proposed: IntersectionObserver-based position detection (as in Floating UI
@@ -144,52 +56,17 @@ Findings from the architecture review of `docs/ARCHITECTURE.md` against `src/`. 
 - [ ] **First mount without an anchor**: with `keepMounted`, content mounts in an unsized
   hidden wrapper, so self-measuring components (charts, maps, video) see the wrong size.
   Document or mitigate.
-- [ ] **Doc fixes in `docs/ARCHITECTURE.md`**
-  - Section 10: style writes are four properties (`visibility`) plus `data-floaty-state`.
-  - Section 4: dependency graph is missing `Floaty`/`FloatyAnchor`/`useRectTracker` -> `utils`.
-  - Section 6.2: note that window `resize` reports `scroll` (snaps), while the anchor's
-    `ResizeObserver` usually reports `layout` in the same frame.
+- [ ] **Doc fix in `docs/ARCHITECTURE.md`** section 6.2: note that window `resize` reports
+  `scroll` (snaps), while the anchor's `ResizeObserver` usually reports `layout` in the same
+  frame.
 
 ## Test coverage
 
-Current suite: 49 tests in jsdom with faked layout (`data-rect`), a recording
-`element.animate` mock and a no-op `ResizeObserver`. It proves what we compute and request,
-not what renders. Update section 15 of `docs/ARCHITECTURE.md` as these land.
-
-### jsdom gaps (cheap, do first)
-
-- [ ] **`useRectTracker`** (`src/useRectTracker.ts`): scroll (capture phase, nested
-  containers), window resize and `ResizeObserver` triggers; one measurement per animation
-  frame; `layout` wins over `scroll` in the same frame; listeners only while active and
-  removed on deactivate/unmount. Needs a controllable `ResizeObserver` fake and a manual
-  `requestAnimationFrame` in `tests/setup.ts`.
-- [ ] **rAF fallback** (`playWithFrames` in `src/animate.ts`): with `element.animate`
-  removed, inner Δ styles are written each frame, resting styles are restored on finish
-  and on cancel, and `onFinish` is not called after cancel.
-- [ ] **Anchor switch mid-flight at component level**: easing restarts from the current
-  gap; spring keyframes start from the current gap and continue with the carried velocity;
-  `onTransitionStart` does not fire again.
-- [ ] **Interruptions that end a transition**:
-  - anchor disappears mid-flight: motion cancelled, hidden, `isAnimating` false;
-  - snap mid-flight (`transition={false}` or reduced motion on the next retarget):
-    `onTransitionEnd` fires once;
-  - `Floaty` unmounts mid-flight: animation cancelled, `isAnimating` cleared.
-- [ ] **StrictMode and multiple `Floaty`s**: double effect invocation keeps the layer and
-  anchor stack correct; layer is ref-counted across several `Floaty`s.
-- [ ] **`bounceSize` with its own spring at component level**: size keyframes follow the
-  given spring (can overshoot) while position uses the main one.
-- [ ] **`useFloaty().remeasure()`** triggers a `layout` measurement.
+Current suite: 74 jsdom tests (`pnpm test`) and 13 Playwright tests against the demo
+(`pnpm test:e2e`). Update section 15 of `docs/ARCHITECTURE.md` as these land.
 
 ### Real browser (Playwright against `demo/`)
 
-- [ ] Set up Playwright (`pnpm add -D @playwright/test`), a `pnpm test:e2e` script, and a
-  config that starts `pnpm dev`.
-- [ ] `calc(100% ± Δ)` and sampled spring keyframes render as intended (inner box matches
-  the anchor at rest and lands exactly at the end).
-- [ ] Scroll at rest: the floaty stays aligned with its anchor (page scroll, nested scroll
-  container, sticky sidebar anchors in the demo).
-- [ ] Scroll mid-transition: no restart, lands on the moved anchor.
-- [ ] Layout shift detection with real `ResizeObserver` and window resize.
-- [ ] Multi-commit anchor swap (lazy/Suspense anchor) to reproduce the same-commit issue
-  before fixing it.
 - [ ] Optional: frame-timing or screenshot checks for scroll lag and jitter.
+- [ ] Run e2e in CI (needs `pnpm exec playwright install --with-deps chromium`); consider
+  adding WebKit and Firefox projects.

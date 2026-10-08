@@ -36,6 +36,16 @@ function fakeRect(this: HTMLElement): DOMRect {
   } as DOMRect;
 }
 
+/** Parses `deltaStyle` output back into numbers. */
+export function parseDelta(keyframe: Keyframe) {
+  const [, x, y] = /translate3d\(([-\d.]+)px, ([-\d.]+)px/.exec(String(keyframe.transform))!;
+  const size = (value: unknown) => {
+    const [, sign, px] = /calc\(100% ([+-]) ([\d.]+)px\)/.exec(String(value))!;
+    return (sign === '-' ? -1 : 1) * Number(px);
+  };
+  return { x: Number(x), y: Number(y), width: size(keyframe.width), height: size(keyframe.height) };
+}
+
 export interface FakeAnimation {
   keyframes: Keyframe[];
   options: KeyframeAnimationOptions;
@@ -48,18 +58,62 @@ export interface FakeAnimation {
 export const animations: FakeAnimation[] = [];
 export const reducedMotion = { value: false };
 
+const resizeObservers = new Set<FakeResizeObserver>();
+
 class FakeResizeObserver {
-  observe() {}
-  unobserve() {}
-  disconnect() {}
+  elements = new Set<Element>();
+  constructor(private callback: ResizeObserverCallback) {}
+  observe(el: Element) {
+    this.elements.add(el);
+    resizeObservers.add(this);
+  }
+  unobserve(el: Element) {
+    this.elements.delete(el);
+  }
+  disconnect() {
+    this.elements.clear();
+    resizeObservers.delete(this);
+  }
+  notify() {
+    this.callback([], this as unknown as ResizeObserver);
+  }
+}
+
+/** Fires every ResizeObserver currently observing `el`. */
+export function triggerResize(el: Element) {
+  for (const observer of [...resizeObservers]) {
+    if (observer.elements.has(el)) observer.notify();
+  }
+}
+
+const frameCallbacks = new Map<number, FrameRequestCallback>();
+let nextFrameId = 0;
+
+/** Number of animation frame callbacks waiting to run. */
+export const pendingFrames = () => frameCallbacks.size;
+
+/** Runs the queued animation frame callbacks once (callbacks may queue more). */
+export function flushFrames(time = performance.now()) {
+  const callbacks = [...frameCallbacks.values()];
+  frameCallbacks.clear();
+  for (const callback of callbacks) callback(time);
 }
 
 beforeEach(() => {
   resetFloaty();
   animations.length = 0;
   reducedMotion.value = false;
+  resizeObservers.clear();
+  frameCallbacks.clear();
   HTMLElement.prototype.getBoundingClientRect = fakeRect;
   vi.stubGlobal('ResizeObserver', FakeResizeObserver);
+  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+    frameCallbacks.set(++nextFrameId, callback);
+    return nextFrameId;
+  });
+  vi.stubGlobal('cancelAnimationFrame', (id: number) => {
+    frameCallbacks.delete(id);
+  });
   window.matchMedia = ((query: string) => ({
     matches: query.includes('reduce') && reducedMotion.value,
     media: query,

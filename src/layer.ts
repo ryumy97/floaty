@@ -16,9 +16,14 @@ function acquireLayer(): HTMLDivElement {
   if (!layer) {
     layer = document.createElement('div');
     layer.setAttribute('data-floaty-layer', '');
+    // Absolute at the document origin, so page scroll moves floaties natively
+    // instead of waiting for a JS re-measure.
     Object.assign(layer.style, {
-      position: 'fixed',
-      inset: '0',
+      position: 'absolute',
+      top: '0',
+      left: '0',
+      width: '0',
+      height: '0',
       pointerEvents: 'none',
       overflow: 'visible',
     });

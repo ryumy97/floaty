@@ -11,7 +11,13 @@ import {
   type Motion,
 } from './animate';
 import { useFloatyLayer } from './layer';
-import { floatyStore, measureElement, resolveTransition, selectSnapshot } from './store';
+import {
+  floatyStore,
+  measureElement,
+  rectsEqual,
+  resolveTransition,
+  selectSnapshot,
+} from './store';
 import type { FloatyRect, FloatyTransition } from './types';
 import { FloatyContentContext } from './useFloatyState';
 import { useIsomorphicLayoutEffect } from './utils';
@@ -74,7 +80,7 @@ export function Floaty<S = unknown>({
   const innerRef = useRef<HTMLDivElement | null>(null);
   const motionRef = useRef<Motion | null>(null);
   const lastAnchorRef = useRef<HTMLElement | null>(null);
-  const lastTargetRef = useRef<FloatyRect | null>(null);
+  const lastTargetRef = useRef<Placement | null>(null);
 
   const config = resolveTransition(transition, defaults);
   const latest = useRef({ config, animateLayoutChanges, onTransitionStart, onTransitionEnd });
@@ -82,7 +88,7 @@ export function Floaty<S = unknown>({
 
   // The outer element always sits exactly on the target (the "offset"); the
   // inner element only animates the remaining gap (the "delta") towards it.
-  // Scrolls move the outer element and never touch a running animation.
+  // Target changes move the outer element and never touch a running animation.
   useIsomorphicLayoutEffect(() => {
     const outer = outerRef.current;
     const inner = innerRef.current;
@@ -95,6 +101,7 @@ export function Floaty<S = unknown>({
       motionRef.current.cancel();
       motionRef.current = null;
       setAnimating(floatyId, false);
+      latest.current.onTransitionEnd?.();
     };
 
     if (!outer || !inner || !layer) {
@@ -116,11 +123,20 @@ export function Floaty<S = unknown>({
     }
 
     const { config, animateLayoutChanges, onTransitionStart, onTransitionEnd } = latest.current;
-    const to = relativeTo(rect, measureElement(layer));
-    lastTargetRef.current = to;
-    applyRect(outer, to);
-
     const sameAnchor = prevAnchor === anchor;
+    const layerRect = measureElement(layer);
+    // Anchors inside a fixed container don't move with the page, so the outer
+    // element is fixed too and uses viewport coordinates; everything else uses
+    // document coordinates (relative to the absolute layer).
+    const fixed =
+      prevTarget && sameAnchor && reason !== 'layout' ? prevTarget.fixed : inFixedContainer(anchor);
+    const next: Placement = { rect: fixed ? rect : relativeTo(rect, layerRect), fixed };
+    lastTargetRef.current = next;
+    if (!prevTarget || prevTarget.fixed !== fixed) outer.style.position = fixed ? 'fixed' : 'absolute';
+    if (!prevTarget || prevTarget.fixed !== fixed || !rectsEqual(prevTarget.rect, next.rect)) {
+      applyRect(outer, next.rect);
+    }
+
     const anchorSwitched = prevAnchor !== null && !sameAnchor;
     // Easing rides along with mid-flight layout shifts; springs absorb them
     // into the gap and keep their velocity.
@@ -139,7 +155,11 @@ export function Floaty<S = unknown>({
       delta: ZERO_RECT,
       velocity: ZERO_RECT,
     };
-    const delta = shiftDelta(currentDelta, prevTarget, to);
+    const delta = shiftDelta(
+      currentDelta,
+      toViewport(prevTarget, layerRect),
+      toViewport(next, layerRect),
+    );
     const curve =
       config !== false && !prefersReducedMotion() ? createCurve(config, delta, velocity) : null;
 
@@ -238,6 +258,23 @@ function setState(el: HTMLElement, state: FloatyState) {
     el.style.visibility = '';
     el.removeAttribute('aria-hidden');
   }
+}
+
+/** Where the outer element sits: viewport coordinates if `fixed`, else layer (document) coordinates. */
+interface Placement {
+  rect: FloatyRect;
+  fixed: boolean;
+}
+
+function toViewport({ rect, fixed }: Placement, layerRect: FloatyRect): FloatyRect {
+  return fixed ? rect : { ...rect, x: rect.x + layerRect.x, y: rect.y + layerRect.y };
+}
+
+function inFixedContainer(el: Element): boolean {
+  for (let node: Element | null = el; node; node = node.parentElement) {
+    if (getComputedStyle(node).position === 'fixed') return true;
+  }
+  return false;
 }
 
 function relativeTo(rect: FloatyRect, origin: FloatyRect): FloatyRect {
