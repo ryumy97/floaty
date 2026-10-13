@@ -20,17 +20,25 @@ export interface FloatyAnchorProps<S = unknown> extends HTMLAttributes<HTMLDivEl
    * Compared shallowly, so inline object literals are fine.
    */
   state?: S;
+  /**
+   * When several anchors share a `floatyId`, the one with the highest priority is
+   * active; ties go to the most recently mounted. Defaults to `0`.
+   */
+  priority?: number;
 }
 
 /**
  * Placeholder that reserves layout space for a `<Floaty>` with the same
- * `floatyId`. When several anchors share it, the most recently mounted one is active.
+ * `floatyId`. When several anchors share it, the one with the highest `priority`
+ * is active, and among equal priorities the most recently mounted one.
  */
 export const FloatyAnchor = forwardRef<HTMLDivElement, FloatyAnchorProps>(
-  function FloatyAnchor({ floatyId, state, ...rest }, forwardedRef) {
+  function FloatyAnchor({ floatyId, state, priority = 0, ...rest }, forwardedRef) {
     const elRef = useRef<HTMLDivElement | null>(null);
     const stateRef = useRef(state);
     stateRef.current = state;
+    const priorityRef = useRef(priority);
+    priorityRef.current = priority;
 
     const ref = useCallback(
       (node: HTMLDivElement | null) => {
@@ -46,8 +54,15 @@ export const FloatyAnchor = forwardRef<HTMLDivElement, FloatyAnchorProps>(
     useIsomorphicLayoutEffect(() => {
       const el = elRef.current;
       if (!el) return;
-      return floatyStore.getState().registerAnchor(floatyId, el, stateRef.current);
+      return floatyStore
+        .getState()
+        .registerAnchor(floatyId, el, stateRef.current, priorityRef.current);
     }, [floatyId]);
+
+    useIsomorphicLayoutEffect(() => {
+      const el = elRef.current;
+      if (el) floatyStore.getState().setAnchorPriority(floatyId, el, priority);
+    }, [floatyId, priority]);
 
     useIsomorphicLayoutEffect(() => {
       const el = elRef.current;

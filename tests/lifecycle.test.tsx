@@ -1,11 +1,11 @@
 import { act, render } from '@testing-library/react';
-import { StrictMode } from 'react';
+import { StrictMode, useEffect, useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { Floaty, FloatyAnchor, type FloatyProps } from '../src';
 import { createCurve, deltaStyle } from '../src/animate';
 import { floatyStore } from '../src/store';
 import type { FloatyRect } from '../src/types';
-import { animations, parseDelta, reducedMotion } from './setup';
+import { animations, endGracePeriod, parseDelta, reducedMotion } from './setup';
 
 const RECTS = {
   a: { x: 0, y: 0, width: 100, height: 50 },
@@ -107,6 +107,8 @@ describe('interruptions', () => {
     expect(isAnimating()).toBe(true);
 
     rerender(<App layout="none" props={props} />);
+    expect(animations[0].cancel).not.toHaveBeenCalled();
+    endGracePeriod();
     expect(animations[0].cancel).toHaveBeenCalled();
     expect(outer().dataset.floatyState).toBe('hidden');
     expect(isAnimating()).toBe(false);
@@ -234,5 +236,83 @@ describe('bounceSize', () => {
     expect(deltas[0]).toEqual(gap(RECTS.a, RECTS.b));
     expect(Math.max(...deltas.map((d) => d.width))).toBeGreaterThan(1);
     expect(Math.max(...deltas.map((d) => d.x))).toBeLessThanOrEqual(0);
+  });
+});
+
+describe('anchor mounting in a later commit', () => {
+  it('stays at the last anchor and animates into one that mounts within the grace period', () => {
+    const onTransitionStart = vi.fn();
+    const props = { transition: easing, onTransitionStart };
+    const { rerender } = render(<App layout="a" props={props} />);
+    rerender(<App layout="none" props={props} />);
+    expect(outer().dataset.floatyState).toBe('visible');
+    expect(outer().style.transform).toBe('translate3d(0px, 0px, 0)');
+
+    rerender(<App layout="b" props={props} />);
+    expect(animations).toHaveLength(1);
+    expect(parseDelta(animations[0].keyframes[0])).toEqual(gap(RECTS.a, RECTS.b));
+    expect(outer().dataset.floatyState).toBe('animating');
+    expect(outer().style.transform).toBe('translate3d(200px, 100px, 0)');
+    expect(onTransitionStart).toHaveBeenCalledTimes(1);
+
+    endGracePeriod();
+    expect(outer().dataset.floatyState).toBe('animating');
+  });
+
+  it('keeps a running transition and retargets it from the current gap', () => {
+    const onTransitionEnd = vi.fn();
+    const props = { transition: easing, onTransitionEnd };
+    const { rerender } = render(<App layout="a" props={props} />);
+    rerender(<App layout="b" props={props} />);
+    animations[0].currentTime = 250;
+    rerender(<App layout="none" props={props} />);
+    expect(animations[0].cancel).not.toHaveBeenCalled();
+    expect(isAnimating()).toBe(true);
+
+    rerender(<App layout="c" props={props} />);
+    const halfway = createCurve(easing, gap(RECTS.a, RECTS.b)).at(250).delta;
+    expect(animations[0].cancel).toHaveBeenCalled();
+    expect(animations[1].keyframes[0]).toEqual(deltaStyle(add(halfway, gap(RECTS.b, RECTS.c))));
+    expect(onTransitionEnd).not.toHaveBeenCalled();
+  });
+
+  it('hides and snaps once the grace period has passed', () => {
+    const props = { transition: easing };
+    const { rerender } = render(<App layout="a" props={props} />);
+    rerender(<App layout="none" props={props} />);
+    endGracePeriod();
+    expect(outer().dataset.floatyState).toBe('hidden');
+
+    rerender(<App layout="b" props={props} />);
+    expect(animations).toHaveLength(0);
+    expect(outer().dataset.floatyState).toBe('visible');
+    expect(outer().style.transform).toBe('translate3d(200px, 100px, 0)');
+  });
+
+  it('animates into an anchor gated on a later state update', () => {
+    function Deferred() {
+      const [ready, setReady] = useState(false);
+      useEffect(() => {
+        const id = setTimeout(() => setReady(true), 50);
+        return () => clearTimeout(id);
+      }, []);
+      return ready ? <FloatyAnchor floatyId="l" data-rect={rectAttr(RECTS.b)} /> : null;
+    }
+    function Host({ routed }: { routed: boolean }) {
+      return (
+        <>
+          <App layout={routed ? 'none' : 'a'} props={{ transition: easing }} />
+          {routed && <Deferred />}
+        </>
+      );
+    }
+    const { rerender } = render(<Host routed={false} />);
+    rerender(<Host routed />);
+    expect(outer().dataset.floatyState).toBe('visible');
+    act(() => {
+      vi.advanceTimersByTime(50);
+    });
+    expect(animations).toHaveLength(1);
+    expect(parseDelta(animations[0].keyframes[0])).toEqual(gap(RECTS.a, RECTS.b));
   });
 });

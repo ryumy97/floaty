@@ -67,6 +67,7 @@ Global options; can be called at any time (changes apply immediately).
 | `zIndex` | `number` | `1000` |
 | `transition` | easing or spring (see [Transitions](#transitions)) | `{ duration: 300, easing: 'ease-in-out' }` |
 | `layerClassName` | `string` | |
+| `anchorGracePeriod` | `number`: ms the last anchor stays active after it unmounts (see below); `0` releases immediately | `150` |
 
 `resetFloaty()` restores the initial state (useful between tests).
 
@@ -98,12 +99,15 @@ false                                           // snap (per Floaty only)
 
 ### `<Floaty>`
 
+Render one `<Floaty>` per `floatyId`. If several are mounted, only the first renders (a
+warning is logged in development); when it unmounts, the next one takes over.
+
 | Prop | Type | Default |
 | --- | --- | --- |
 | `floatyId` | `string` | required |
-| `children` | `ReactNode \| (state, { hasAnchor, isAnimating }) => ReactNode` | |
+| `children` | `ReactNode \| (state, { hasAnchor, isAnimating, settledState }) => ReactNode` | |
 | `transition` | `false`, easing or spring (see [Transitions](#transitions)) | global default |
-| `keepMounted` | `boolean`: keep children mounted (hidden) while no anchor exists | `true` |
+| `keepMounted` | `true`: keep children mounted (hidden) while no anchor exists; `'afterAnchor'`: the same, but wait for a size before mounting them the first time (see below); `false`: unmount them | `true` |
 | `animateLayoutChanges` | `boolean`: also animate when the active anchor itself moves or resizes | `true` |
 | `className` / `style` | styling of the visible box around `children` (avoid `transform`, `width`, `height`) | |
 | `onTransitionStart` / `onTransitionEnd` | `() => void` | |
@@ -112,14 +116,43 @@ The content renders as `div[data-floaty] > div[data-floaty-content]`. The outer 
 on the anchor's rect and exposes `data-floaty-state="hidden" | "visible" | "animating"`; the
 inner element is the visible box that animates and receives `className` and `style`.
 
+#### Content that measures itself
+
+With the default `keepMounted`, content mounts right away, hidden. Before any anchor has
+been measured it has no size to take, so its box is `0 × 0`. Content that sizes itself
+from its container on mount (charts, maps, canvases, video players, virtualized lists)
+then measures zero. Use `keepMounted="afterAnchor"` for such content: it mounts once the
+first anchor has been measured, already at that anchor's size (even for layout effects in
+the content), and then stays mounted like `true`. Hidden content always keeps the last
+known size, including when `Floaty` itself remounts.
+
 ### `<FloatyAnchor>`
 
-Accepts all `div` props (including a native `id`) plus `floatyId` and an optional `state`.
-If several anchors share a `floatyId`, the most recently mounted one is active; when it
-unmounts, the previous one becomes active again.
+Accepts all `div` props (including a native `id`) plus `floatyId`, an optional `state`
+and an optional `priority` (default `0`).
 
-Anchors are re-measured on resize (`ResizeObserver`), window resize, any scroll, and
-whenever the anchor re-renders.
+If several anchors share a `floatyId`, the one with the highest `priority` is active;
+among equal priorities, the most recently mounted one. When it unmounts, the next one by
+the same rule becomes active again, and changing `priority` switches (and animates) to the
+new winner. "Most recently mounted" follows React's layout-effect order, so anchors that
+mount together resolve by tree order (the later sibling wins, and a parent wins over an
+anchor nested inside it), and an anchor whose `floatyId` changes or that a React 19
+`<Activity>` reveals counts as newly mounted. Set `priority` whenever two anchors can be
+mounted at once and the winner matters:
+
+```tsx
+<FloatyAnchor floatyId="player" priority={1} /> {/* detail view: always wins */}
+<FloatyAnchor floatyId="player" />              {/* list item */}
+```
+
+When the last anchor unmounts, the content stays where it was for `anchorGracePeriod` ms
+before hiding. An anchor that mounts within that window (after a lazy route, a `Suspense`
+fallback, or data loading) still animates from the old position instead of snapping.
+`useFloaty().hasAnchor` stays `true` during the window.
+
+Anchors are re-measured on resize (`ResizeObserver`), on moves without resize such as an
+image loading or a sibling expanding above them (`IntersectionObserver`), on window resize,
+any scroll, and whenever the anchor re-renders.
 
 ### Anchor state
 
@@ -151,17 +184,82 @@ re-renders the content without moving it. State is compared shallowly, so inline
 literals don't cause extra renders. While no anchor exists, the last active anchor's state
 is kept.
 
+#### Switching form on landing
+
+If a form only fits the destination box (a mini player's controls, a compact card), switch
+it when the content lands instead of when it takes off. `useFloatyTransition<S>()` returns
+`{ state, settledState, isAnimating }`; `settledState` keeps the previous anchor's state
+for the whole transition and switches once the content lands (immediately if the move
+snaps):
+
+```tsx
+function Player() {
+  const { settledState } = useFloatyTransition<PlayerState>();
+  return <PlayerView mode={settledState?.mode ?? 'full'} />;
+}
+```
+
+Render-function children get it as `status.settledState`. Combine `state`,
+`settledState` and `isAnimating` for custom effects such as a cross-fade between forms.
+
 ### `useFloaty(floatyId)`
 
-Returns `{ hasAnchor, isAnimating, rect, state, remeasure }`. Call `remeasure()` after
-layout changes that neither resize nor re-render the anchor (for example, a CSS-only change
-on an ancestor).
+Returns `{ hasAnchor, isAnimating, rect, state, remeasure }`. Moves are detected
+automatically; `remeasure()` forces a re-measure, for example where `IntersectionObserver`
+is unavailable or to animate a move that happened right after a scroll.
+
+A component re-renders only when a field it reads changes. Reading `rect` re-renders on
+every scroll frame; reading only `hasAnchor`, `isAnimating` or `state` does not. Likewise,
+scrolling never re-renders `<Floaty>` or calls its render-function children.
+
+### `createFloaty<S>(floatyId)`
+
+Binds the components and hooks to one id and types its anchor `state`, so a typo in an id
+or a mismatched state shape is a compile error instead of content that never shows. Call
+it once at module scope:
+
+```tsx
+// player.ts
+export const player = createFloaty<{ mode: 'full' | 'mini' }>('player');
+
+// App.tsx
+<player.Floaty>{(state) => <Player mode={state?.mode ?? 'full'} />}</player.Floaty>
+<player.FloatyAnchor state={{ mode: 'mini' }} />   // `state={{ mode: 'tiny' }}` doesn't compile
+const { hasAnchor } = player.useFloaty();
+```
+
+It returns `{ floatyId, Floaty, FloatyAnchor, useFloaty, useFloatyState,
+useFloatyTransition }`, which take the same props and return the same values as the
+unbound API, without `floatyId`. They share the global store, so they can be mixed with
+`<Floaty floatyId="player">`. The bound `useFloatyState()` and `useFloatyTransition()`
+also throw if called inside another id's content.
 
 ### Notes
 
 The store is module-global: every React root on the page shares the same `floatyId`
-namespace. With server rendering, nothing floats on the server (the layer is created on
+namespace. An id's entry is dropped once no anchor, `Floaty` or `useFloaty` uses it, so
+dynamic ids don't leak; the last `rect` and `state` are kept only while something reads
+the id. With server rendering, nothing floats on the server (the layer is created on
 the client), and anchors only register in the browser.
+
+### Portal side effects
+
+Floating content is rendered into a layer at the end of `body` (DOM) from wherever
+`<Floaty>` is placed (React). It is never inside the anchor, so:
+
+- **CSS** inherits from `body` and the layer, not the anchor's ancestors: theme classes,
+  CSS variables, fonts and colors set on a page wrapper don't reach it, and selectors like
+  `.card:hover .title` or `@container` queries from the anchor's side don't match. Use
+  `configureFloaty({ layerClassName })`, `<Floaty className>`, or anchor `state`.
+- **React context and events** come from `<Floaty>`'s position in the React tree. Providers
+  and `onClick` handlers around the anchor don't see the content.
+- **Native events and DOM checks** go through the layer to `body`: `anchorParent.contains(
+  target)` is `false` for the content, so click-outside handlers should also accept
+  `target.closest('[data-floaty]')`.
+- **Forms and modals**: inputs aren't part of a `<form>` around the anchor (use the `form`
+  attribute), and content anchored inside a modal `<dialog>` is covered and inert.
+
+See section 12.1 of [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the full list.
 
 ## Development
 

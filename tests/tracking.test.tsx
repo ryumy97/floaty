@@ -3,7 +3,14 @@ import { useImperativeHandle, type Ref } from 'react';
 import { describe, expect, it } from 'vitest';
 import { Floaty, FloatyAnchor, useFloaty } from '../src';
 import { floatyStore } from '../src/store';
-import { animations, flushFrames, pendingFrames, triggerResize } from './setup';
+import {
+  animations,
+  fireIntersection,
+  flushFrames,
+  intersectionObservers,
+  pendingFrames,
+  triggerResize,
+} from './setup';
 
 function App({ anchors = ['a'] }: { anchors?: string[] }) {
   return (
@@ -73,6 +80,30 @@ describe('useRectTracker', () => {
     expect(pendingFrames()).toBe(0);
   });
 
+  it('detects moves without resize, scroll or re-render as layout changes', () => {
+    render(<App />);
+    const anchor = screen.getByTestId('anchor-a');
+    fireIntersection(anchor, 1);
+
+    move('a', '0,60,10,10');
+    fireIntersection(anchor, 0.4);
+    flush();
+    expect(snapshot().reason).toBe('layout');
+    expect(outer().style.transform).toBe('translate3d(0px, 60px, 0)');
+  });
+
+  it('attributes moves right after a scroll to the scroll', () => {
+    render(<App />);
+    const anchor = screen.getByTestId('anchor-a');
+    fireIntersection(anchor, 1);
+
+    move('a', '0,-30,10,10');
+    fireEvent.scroll(window);
+    fireIntersection(anchor, 0.7);
+    flush();
+    expect(snapshot().reason).toBe('scroll');
+  });
+
   it('only tracks the active anchor', () => {
     render(<App anchors={['a', 'b']} />);
     triggerResize(screen.getByTestId('anchor-a'));
@@ -88,10 +119,12 @@ describe('useRectTracker', () => {
     expect(pendingFrames()).toBe(0);
 
     rerender(<App />);
+    expect(intersectionObservers.size).toBe(1);
     unmount();
     fireEvent.scroll(window);
     fireEvent(window, new Event('resize'));
     expect(pendingFrames()).toBe(0);
+    expect(intersectionObservers.size).toBe(0);
   });
 
   it('cancels a pending frame when the anchor deactivates', () => {

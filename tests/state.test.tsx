@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { useEffect, useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { Floaty, FloatyAnchor, useFloaty, useFloatyState } from '../src';
-import { animations } from './setup';
+import { animations, endGracePeriod } from './setup';
 
 interface CounterState {
   variant: 'full' | 'compact';
@@ -145,6 +145,7 @@ describe('anchor state', () => {
     rerender(<Host layout="compact" />);
     expect(screen.getByTestId('out').textContent).toBe('compact:true');
     rerender(<Host layout="none" />);
+    endGracePeriod();
     expect(screen.getByTestId('out').textContent).toBe('compact:false');
   });
 

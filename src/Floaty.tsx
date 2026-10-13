@@ -1,4 +1,4 @@
-import { useMemo, useRef, type CSSProperties, type ReactNode } from 'react';
+import { useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useStore } from 'zustand';
 import {
@@ -18,13 +18,18 @@ import {
   resolveTransition,
   selectSnapshot,
 } from './store';
-import type { FloatyRect, FloatyTransition } from './types';
+import type { FloatyRect, FloatySnapshot, FloatyTransition } from './types';
 import { FloatyContentContext } from './useFloatyState';
 import { useIsomorphicLayoutEffect } from './utils';
 
-export interface FloatyRenderStatus {
+export interface FloatyRenderStatus<S = unknown> {
   hasAnchor: boolean;
   isAnimating: boolean;
+  /**
+   * The state of the anchor the content rests on: during a transition it keeps
+   * the previous anchor's state and switches once the content lands.
+   */
+  settledState: S | undefined;
 }
 
 export interface FloatyProps<S = unknown> {
@@ -34,7 +39,7 @@ export interface FloatyProps<S = unknown> {
    * Content to float. Pass a function to render from the active anchor's
    * `state`; the returned tree keeps its React state across anchor switches.
    */
-  children?: ReactNode | ((state: S | undefined, status: FloatyRenderStatus) => ReactNode);
+  children?: ReactNode | ((state: S | undefined, status: FloatyRenderStatus<S>) => ReactNode);
   /**
    * `false` snaps to the new anchor instantly. `{ duration?, easing? }`
    * overrides the global easing default set with `configureFloaty`;
@@ -43,9 +48,11 @@ export interface FloatyProps<S = unknown> {
   transition?: FloatyTransition;
   /**
    * Keep children mounted (hidden) while no anchor exists, so their state
-   * survives layouts without an anchor. Defaults to `true`.
+   * survives layouts without an anchor. `'afterAnchor'` waits until an anchor
+   * has given the content a size before mounting it the first time (for
+   * self-measuring content), then keeps it mounted. Defaults to `true`.
    */
-  keepMounted?: boolean;
+  keepMounted?: boolean | 'afterAnchor';
   /** Animate when the active anchor itself moves or resizes. Defaults to `true`. */
   animateLayoutChanges?: boolean;
   /** Applied to the visible box that wraps `children`. */
@@ -73,26 +80,61 @@ export function Floaty<S = unknown>({
   onTransitionEnd,
 }: FloatyProps<S>) {
   const layer = useFloatyLayer();
-  const snapshot = useStore(floatyStore, selectSnapshot(floatyId));
+  // Only what affects rendering; rect changes are applied without re-rendering.
+  const select = selectSnapshot(floatyId);
+  const anchor = useStore(floatyStore, (s) => select(s).anchor);
+  const anchorState = useStore(floatyStore, (s) => select(s).state);
+  const isAnimating = useStore(floatyStore, (s) => select(s).isAnimating);
+  const hasSize = useStore(floatyStore, (s) => select(s).rect !== null);
   const defaults = useStore(floatyStore, (state) => state.config.transition);
+  const [token] = useState(() => ({}));
+  const [settledState, setSettledState] = useState(anchorState);
+  const isOwner = useStore(floatyStore, (s) => s.owners[floatyId]?.[0] === token);
 
   const outerRef = useRef<HTMLDivElement | null>(null);
   const innerRef = useRef<HTMLDivElement | null>(null);
   const motionRef = useRef<Motion | null>(null);
   const lastAnchorRef = useRef<HTMLElement | null>(null);
   const lastTargetRef = useRef<Placement | null>(null);
+  const appliedRef = useRef<{ version: number; outer: HTMLElement } | null>(null);
 
   const config = resolveTransition(transition, defaults);
   const latest = useRef({ config, animateLayoutChanges, onTransitionStart, onTransitionEnd });
   latest.current = { config, animateLayoutChanges, onTransitionStart, onTransitionEnd };
 
+  // Anchor changes are positioned from this effect after React re-renders, so an
+  // anchor swap within one commit is seen as a single switch (section 9). Rect
+  // changes of the positioned anchor are applied straight from the store
+  // subscription, so scroll and layout updates never re-render this component.
+  useIsomorphicLayoutEffect(() => {
+    const update = (snapshot: FloatySnapshot) => {
+      const outer = outerRef.current;
+      const applied = appliedRef.current;
+      if (outer && applied?.version === snapshot.version && applied.outer === outer) return;
+      appliedRef.current = outer ? { version: snapshot.version, outer } : null;
+      position(snapshot);
+    };
+    update(select(floatyStore.getState()));
+    return floatyStore.subscribe((state, prev) => {
+      const snapshot = select(state);
+      if (snapshot !== select(prev) && snapshot.anchor === lastAnchorRef.current) {
+        update(snapshot);
+      }
+    });
+  }, [floatyId, layer, anchor, keepMounted, isOwner, hasSize]);
+
+  // Runs after positioning: on an animated switch the motion has already
+  // started, so the settled state waits for the transition to end.
+  useIsomorphicLayoutEffect(() => {
+    if (!motionRef.current) setSettledState(anchorState);
+  }, [anchorState, isAnimating]);
+
   // The outer element always sits exactly on the target (the "offset"); the
   // inner element only animates the remaining gap (the "delta") towards it.
   // Target changes move the outer element and never touch a running animation.
-  useIsomorphicLayoutEffect(() => {
+  function position({ anchor, rect, reason }: FloatySnapshot) {
     const outer = outerRef.current;
     const inner = innerRef.current;
-    const { anchor, rect, reason } = snapshot;
     const running = motionRef.current;
     const { setAnimating } = floatyStore.getState();
 
@@ -186,32 +228,46 @@ export function Floaty<S = unknown>({
       floatyStore.getState().setAnimating(floatyId, false);
       latest.current.onTransitionEnd?.();
     });
-  }, [floatyId, layer, snapshot.version, snapshot.anchor, keepMounted]);
+  }
 
-  useIsomorphicLayoutEffect(
-    () => () => {
-      motionRef.current?.cancel();
-      motionRef.current = null;
-      floatyStore.getState().setAnimating(floatyId, false);
-    },
-    [floatyId],
-  );
+  useIsomorphicLayoutEffect(() => {
+    const { retain, claimFloaty } = floatyStore.getState();
+    const release = retain(floatyId);
+    const unclaim = claimFloaty(floatyId, token);
+    return () => {
+      // Only the instance running the transition owns `isAnimating`.
+      if (motionRef.current) {
+        motionRef.current.cancel();
+        motionRef.current = null;
+        floatyStore.getState().setAnimating(floatyId, false);
+      }
+      unclaim();
+      release();
+    };
+  }, [floatyId, token]);
 
   const contentContext = useMemo(
-    () => ({ floatyId, state: snapshot.state }),
-    [floatyId, snapshot.state],
+    () => ({ floatyId, state: anchorState, settledState, isAnimating }),
+    [floatyId, anchorState, settledState, isAnimating],
   );
 
-  if (!layer) return null;
-  if (!keepMounted && !snapshot.anchor) return null;
+  if (!layer || !isOwner) return null;
+  if (!keepMounted && !anchor) return null;
+  if (keepMounted === 'afterAnchor' && !hasSize) return null;
 
   const content =
     typeof children === 'function'
-      ? children(snapshot.state as S | undefined, {
-          hasAnchor: snapshot.anchor !== null,
-          isAnimating: snapshot.isAnimating,
+      ? children(anchorState as S | undefined, {
+          hasAnchor: anchor !== null,
+          isAnimating,
+          settledState: settledState as S | undefined,
         })
       : children;
+
+  // Content layout effects run before the positioning effect, so the outer
+  // element gets the known size at render. It always matches what positioning
+  // applies, so React never overwrites a different value.
+  const size = select(floatyStore.getState()).rect;
 
   return createPortal(
     <div
@@ -221,6 +277,8 @@ export function Floaty<S = unknown>({
         position: 'absolute',
         top: 0,
         left: 0,
+        width: size ? `${size.width}px` : undefined,
+        height: size ? `${size.height}px` : undefined,
         pointerEvents: 'none',
         willChange: 'transform',
       }}

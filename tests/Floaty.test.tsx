@@ -1,10 +1,10 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
-import { useEffect, useState, type ReactNode } from 'react';
+import { StrictMode, useEffect, useState, type ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { Floaty, FloatyAnchor, configureFloaty, useFloaty, type FloatyProps } from '../src';
 import { createCurve, deltaStyle } from '../src/animate';
 import { floatyStore } from '../src/store';
-import { animations, reducedMotion } from './setup';
+import { animations, endGracePeriod, reducedMotion } from './setup';
 
 let mounts = 0;
 
@@ -171,6 +171,8 @@ describe('Floaty', () => {
     fireEvent.click(screen.getByRole('button'));
 
     rerender(<App layout="none" />);
+    expect(item().dataset.floatyState).toBe('visible');
+    endGracePeriod();
     expect(item().dataset.floatyState).toBe('hidden');
     expect(item().style.visibility).toBe('hidden');
     expect(item().getAttribute('aria-hidden')).toBe('true');
@@ -187,6 +189,8 @@ describe('Floaty', () => {
     fireEvent.click(screen.getByRole('button'));
 
     rerender(<App layout="none" floatyProps={{ keepMounted: false }} />);
+    expect(screen.getByRole('button').textContent).toBe('count: 1');
+    endGracePeriod();
     expect(screen.queryByRole('button')).toBeNull();
 
     rerender(<App layout="a" floatyProps={{ keepMounted: false }} />);
@@ -364,5 +368,64 @@ describe('useFloaty', () => {
 
     act(() => animations[0].finish());
     expect(status()).toEqual({ hasAnchor: true, isAnimating: false, width: 200 });
+  });
+});
+
+describe('store garbage collection', () => {
+  const ids = () => Object.keys(floatyStore.getState().snapshots).sort();
+  const flush = () => act(() => Promise.resolve());
+
+  function Items({ ids, reader }: { ids: string[]; reader?: string }) {
+    function Reader({ id }: { id: string }) {
+      useFloaty(id);
+      return null;
+    }
+    return (
+      <>
+        {ids.map((id) => (
+          <div key={id}>
+            <Floaty floatyId={id}>{id}</Floaty>
+            <FloatyAnchor floatyId={id} data-rect="0,0,10,10" />
+          </div>
+        ))}
+        {reader && <Reader id={reader} />}
+      </>
+    );
+  }
+
+  it('drops entries for dynamic ids once their Floaty and anchors unmount', async () => {
+    const { rerender } = render(<Items ids={['x', 'y', 'z']} />);
+    expect(ids()).toEqual(['x', 'y', 'z']);
+
+    rerender(<Items ids={['y']} />);
+    endGracePeriod();
+    await flush();
+    expect(ids()).toEqual(['y']);
+    expect(Object.keys(floatyStore.getState().anchors)).toEqual(['y']);
+  });
+
+  it('keeps an entry while useFloaty still reads it', async () => {
+    const { rerender } = render(<Items ids={['x']} reader="x" />);
+    rerender(<Items ids={[]} reader="x" />);
+    endGracePeriod();
+    await flush();
+    expect(floatyStore.getState().snapshots.x).toMatchObject({
+      anchor: null,
+      rect: { x: 0, y: 0, width: 10, height: 10 },
+    });
+
+    rerender(<Items ids={[]} />);
+    await flush();
+    expect(ids()).toEqual([]);
+  });
+
+  it('survives StrictMode effect replays', async () => {
+    render(
+      <StrictMode>
+        <Items ids={['x']} />
+      </StrictMode>,
+    );
+    await flush();
+    expect(floatyStore.getState().snapshots.x?.anchor).not.toBeNull();
   });
 });

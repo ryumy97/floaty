@@ -4,6 +4,7 @@ import {
   configureFloaty,
   useFloaty,
   useFloatyState,
+  useFloatyTransition,
   type FloatyTransition,
 } from 'floaty-component';
 import { useEffect, useState } from 'react';
@@ -39,8 +40,9 @@ function Counter() {
   );
 }
 
-function Player() {
-  const mode = useFloatyState<PlayerState>()?.mode ?? 'full';
+function Player({ switchOnLanding }: { switchOnLanding: boolean }) {
+  const { state, settledState } = useFloatyTransition<PlayerState>();
+  const mode = (switchOnLanding ? settledState : state)?.mode ?? 'full';
   const [elapsed, setElapsed] = useState(0);
   const [playing, setPlaying] = useState(true);
   useEffect(() => {
@@ -77,6 +79,18 @@ function Placeholder({ label }: { label: string }) {
   return <div className="placeholder">{label}</div>;
 }
 
+/** Grows with its own state, moving the anchors below without re-rendering them. */
+function Expander() {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="placeholder" style={{ minHeight: open ? 320 : 120 }}>
+      <button type="button" onClick={() => setOpen((o) => !o)}>
+        {open ? 'Collapse' : 'Expand'} this row
+      </button>
+    </div>
+  );
+}
+
 function Placeholders({ label, count, from = 1 }: { label: string; count: number; from?: number }) {
   return (
     <>
@@ -104,7 +118,8 @@ function Content({ layout }: { layout: Layout }) {
     case 'list':
       return (
         <div className="list">
-          <Placeholders label="Row" count={3} />
+          <Expander />
+          <Placeholders label="Row" count={2} />
           <FloatyAnchor
             floatyId="counter"
             className="anchor row"
@@ -192,6 +207,7 @@ export function App() {
   const [duration, setDuration] = useState(400);
   const [kind, setKind] = useState<'easing' | 'spring'>('easing');
   const [bounce, setBounce] = useState(0.3);
+  const [switchOnLanding, setSwitchOnLanding] = useState(false);
   const transition: FloatyTransition = !animated
     ? false
     : kind === 'spring'
@@ -250,11 +266,19 @@ export function App() {
             {bounce.toFixed(2)}
           </label>
         )}
+        <label>
+          <input
+            type="checkbox"
+            checked={switchOnLanding}
+            onChange={(e) => setSwitchOnLanding(e.target.checked)}
+          />
+          player switches form on landing
+        </label>
         <Status />
       </header>
 
       <Floaty floatyId="player" transition={transition}>
-        <Player />
+        <Player switchOnLanding={switchOnLanding} />
       </Floaty>
       <Floaty floatyId="counter" transition={transition}>
         <Counter />

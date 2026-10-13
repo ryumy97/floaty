@@ -1,4 +1,4 @@
-import { cleanup } from '@testing-library/react';
+import { act, cleanup } from '@testing-library/react';
 import { afterEach, beforeEach, vi } from 'vitest';
 import { resetFloaty } from '../src/store';
 
@@ -86,6 +86,42 @@ export function triggerResize(el: Element) {
   }
 }
 
+export const intersectionObservers = new Set<FakeIntersectionObserver>();
+
+export class FakeIntersectionObserver {
+  elements = new Set<Element>();
+  constructor(
+    private callback: IntersectionObserverCallback,
+    public options: IntersectionObserverInit = {},
+  ) {
+    intersectionObservers.add(this);
+  }
+  observe(el: Element) {
+    this.elements.add(el);
+  }
+  unobserve(el: Element) {
+    this.elements.delete(el);
+  }
+  disconnect() {
+    this.elements.clear();
+    intersectionObservers.delete(this);
+  }
+  takeRecords() {
+    return [];
+  }
+  fire(intersectionRatio: number) {
+    const entry = { intersectionRatio } as IntersectionObserverEntry;
+    this.callback([entry], this as unknown as IntersectionObserver);
+  }
+}
+
+/** Fires every IntersectionObserver currently observing `el` with `ratio`. */
+export function fireIntersection(el: Element, ratio: number) {
+  for (const observer of [...intersectionObservers]) {
+    if (observer.elements.has(el)) observer.fire(ratio);
+  }
+}
+
 const frameCallbacks = new Map<number, FrameRequestCallback>();
 let nextFrameId = 0;
 
@@ -99,14 +135,24 @@ export function flushFrames(time = performance.now()) {
   for (const callback of callbacks) callback(time);
 }
 
+/** Expires pending anchor grace periods (`anchorGracePeriod`). */
+export function endGracePeriod() {
+  act(() => {
+    vi.runOnlyPendingTimers();
+  });
+}
+
 beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
   resetFloaty();
   animations.length = 0;
   reducedMotion.value = false;
   resizeObservers.clear();
+  intersectionObservers.clear();
   frameCallbacks.clear();
   HTMLElement.prototype.getBoundingClientRect = fakeRect;
   vi.stubGlobal('ResizeObserver', FakeResizeObserver);
+  vi.stubGlobal('IntersectionObserver', FakeIntersectionObserver);
   vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
     frameCallbacks.set(++nextFrameId, callback);
     return nextFrameId;
@@ -144,4 +190,5 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
+  vi.useRealTimers();
 });

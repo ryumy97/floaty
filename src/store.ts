@@ -1,5 +1,6 @@
 import { createStore } from 'zustand/vanilla';
 import { shallow } from 'zustand/vanilla/shallow';
+import { warnDev } from './utils';
 import type {
   FloatyChangeReason,
   FloatyEasingTransition,
@@ -41,6 +42,12 @@ export interface FloatyConfig {
   transition: FloatyTransitionConfig;
   /** Class name applied to the overlay layer. */
   layerClassName?: string;
+  /**
+   * How long (ms) the last anchor stays active after it unmounts, so an anchor that
+   * mounts in a later commit still animates from it. `0` releases immediately.
+   * Defaults to 150.
+   */
+  anchorGracePeriod: number;
 }
 
 export const EMPTY_SNAPSHOT: FloatySnapshot = {
@@ -52,19 +59,45 @@ export const EMPTY_SNAPSHOT: FloatySnapshot = {
   isAnimating: false,
 };
 
-const DEFAULT_CONFIG: FloatyConfig = { zIndex: 1000, transition: DEFAULT_TRANSITION };
+const DEFAULT_CONFIG: FloatyConfig = {
+  zIndex: 1000,
+  transition: DEFAULT_TRANSITION,
+  anchorGracePeriod: 150,
+};
 
 interface FloatyState {
   config: FloatyConfig;
-  /** Mounted anchors per floatyId; the last one is active. */
+  /**
+   * Mounted anchors per floatyId in registration order. The active one has the
+   * highest `priority`; ties go to the last registered.
+   */
   anchors: Record<string, HTMLElement[]>;
   snapshots: Record<string, FloatySnapshot>;
-  registerAnchor(floatyId: string, el: HTMLElement, anchorState?: unknown): () => void;
+  /** Mounted `Floaty` instances per floatyId in mount order; the first one renders. */
+  owners: Record<string, object[]>;
+  registerAnchor(
+    floatyId: string,
+    el: HTMLElement,
+    anchorState?: unknown,
+    priority?: number,
+  ): () => void;
+  /** Changes an anchor's priority and re-picks the active anchor. */
+  setAnchorPriority(floatyId: string, el: HTMLElement, priority: number): void;
   /** Updates an anchor's state; reflected in the snapshot only while it is active. */
   setAnchorState(floatyId: string, el: HTMLElement, anchorState: unknown): void;
   /** Re-measures the active anchor. No-op if its rect did not change. */
   measure(floatyId: string, reason?: FloatyChangeReason): void;
   setAnimating(floatyId: string, isAnimating: boolean): void;
+  /**
+   * Keeps `floatyId`'s entry alive while it has no anchors (used by `Floaty` and
+   * `useFloaty`). Returns the release function.
+   */
+  retain(floatyId: string): () => void;
+  /**
+   * Registers a `Floaty` instance (`token`) for `floatyId`. Only the first
+   * registered instance renders; returns the unregister function.
+   */
+  claimFloaty(floatyId: string, token: object): () => void;
 }
 
 export function measureElement(el: Element): FloatyRect {
@@ -79,6 +112,32 @@ export function rectsEqual(a: FloatyRect | null, b: FloatyRect | null): boolean 
 }
 
 const anchorStates = new Map<HTMLElement, unknown>();
+const anchorPriorities = new Map<HTMLElement, number>();
+
+/** Highest priority wins; ties go to the most recently registered anchor. */
+function pickActive(anchors: HTMLElement[]): HTMLElement | null {
+  let active: HTMLElement | null = null;
+  let best = -Infinity;
+  for (const anchor of anchors) {
+    const priority = anchorPriorities.get(anchor) ?? 0;
+    if (priority >= best) {
+      best = priority;
+      active = anchor;
+    }
+  }
+  return active;
+}
+/** Grace timers for floatyIds whose last anchor unmounted. */
+const releases = new Map<string, ReturnType<typeof setTimeout>>();
+/** Number of mounted `Floaty`s and `useFloaty`s reading each floatyId. */
+const holders = new Map<string, number>();
+/** floatyIds already warned about duplicate `Floaty`s. */
+const warnedDuplicates = new Set<string>();
+
+function cancelRelease(floatyId: string) {
+  clearTimeout(releases.get(floatyId));
+  releases.delete(floatyId);
+}
 
 export const floatyStore = createStore<FloatyState>()((set, get) => {
   const snapshotOf = (floatyId: string) => get().snapshots[floatyId] ?? EMPTY_SNAPSHOT;
@@ -99,9 +158,40 @@ export const floatyStore = createStore<FloatyState>()((set, get) => {
     }));
   };
 
-  const activate = (floatyId: string, anchors: HTMLElement[]) => {
+  const isUnused = (floatyId: string) =>
+    !holders.has(floatyId) && !releases.has(floatyId) && !get().anchors[floatyId]?.length;
+
+  // Deferred so a holder or anchor that unmounts and remounts within one commit
+  // (StrictMode, key changes, layout swaps) keeps the entry.
+  const collect = (floatyId: string) => {
+    queueMicrotask(() => {
+      const { anchors, snapshots } = get();
+      if (!isUnused(floatyId) || !(floatyId in anchors || floatyId in snapshots)) return;
+      const { [floatyId]: _anchors, ...restAnchors } = anchors;
+      const { [floatyId]: _snapshot, ...restSnapshots } = snapshots;
+      set({ anchors: restAnchors, snapshots: restSnapshots });
+    });
+  };
+
+  const activate = (floatyId: string, anchors: HTMLElement[], graceful = false) => {
+    cancelRelease(floatyId);
     const prev = snapshotOf(floatyId);
-    const anchor = anchors[anchors.length - 1] ?? null;
+    const anchor = pickActive(anchors);
+    const grace = get().config.anchorGracePeriod;
+    if (!anchor && prev.anchor && graceful && grace > 0) {
+      // Keep the unmounted anchor active so a replacement registering in a later
+      // commit is still seen as a direct switch (section 9).
+      set((state) => ({ anchors: { ...state.anchors, [floatyId]: anchors } }));
+      releases.set(
+        floatyId,
+        setTimeout(() => {
+          releases.delete(floatyId);
+          activate(floatyId, get().anchors[floatyId] ?? []);
+        }, grace),
+      );
+      return;
+    }
+    if (!anchor) collect(floatyId);
     if (anchor === prev.anchor) {
       set((state) => ({ anchors: { ...state.anchors, [floatyId]: anchors } }));
       return;
@@ -122,16 +212,25 @@ export const floatyStore = createStore<FloatyState>()((set, get) => {
     config: DEFAULT_CONFIG,
     anchors: {},
     snapshots: {},
+    owners: {},
 
-    registerAnchor(floatyId, el, anchorState) {
+    registerAnchor(floatyId, el, anchorState, priority = 0) {
       anchorStates.set(el, anchorState);
+      anchorPriorities.set(el, priority);
       const current = get().anchors[floatyId] ?? [];
       activate(floatyId, [...current.filter((a) => a !== el), el]);
       return () => {
         const remaining = (get().anchors[floatyId] ?? []).filter((a) => a !== el);
-        activate(floatyId, remaining);
+        activate(floatyId, remaining, true);
         anchorStates.delete(el);
+        anchorPriorities.delete(el);
       };
+    },
+
+    setAnchorPriority(floatyId, el, priority) {
+      if (!anchorPriorities.has(el) || anchorPriorities.get(el) === priority) return;
+      anchorPriorities.set(el, priority);
+      activate(floatyId, get().anchors[floatyId] ?? []);
     },
 
     setAnchorState(floatyId, el, anchorState) {
@@ -142,7 +241,7 @@ export const floatyStore = createStore<FloatyState>()((set, get) => {
 
     measure(floatyId, reason = 'layout') {
       const { anchor, rect } = snapshotOf(floatyId);
-      if (!anchor) return;
+      if (!anchor?.isConnected) return;
       const next = measureElement(anchor);
       if (rectsEqual(rect, next)) return;
       patchSnapshot(floatyId, { rect: next, reason });
@@ -151,6 +250,41 @@ export const floatyStore = createStore<FloatyState>()((set, get) => {
     setAnimating(floatyId, isAnimating) {
       if (snapshotOf(floatyId).isAnimating === isAnimating) return;
       patchSnapshot(floatyId, { isAnimating });
+    },
+
+    claimFloaty(floatyId, token) {
+      const current = get().owners[floatyId] ?? [];
+      if (current.length > 0 && !warnedDuplicates.has(floatyId)) {
+        warnedDuplicates.add(floatyId);
+        warnDev(
+          `Several <Floaty floatyId="${floatyId}"> are mounted. Only the first one renders; ` +
+            'the others render nothing until it unmounts. Render one <Floaty> per floatyId.',
+        );
+      }
+      set((state) => ({ owners: { ...state.owners, [floatyId]: [...current, token] } }));
+      return () => {
+        set((state) => {
+          const remaining = (state.owners[floatyId] ?? []).filter((t) => t !== token);
+          const { [floatyId]: _removed, ...rest } = state.owners;
+          return { owners: remaining.length ? { ...rest, [floatyId]: remaining } : rest };
+        });
+      };
+    },
+
+    retain(floatyId) {
+      holders.set(floatyId, (holders.get(floatyId) ?? 0) + 1);
+      let released = false;
+      return () => {
+        if (released) return;
+        released = true;
+        const count = (holders.get(floatyId) ?? 1) - 1;
+        if (count > 0) {
+          holders.set(floatyId, count);
+          return;
+        }
+        holders.delete(floatyId);
+        collect(floatyId);
+      };
     },
   };
 });
@@ -179,5 +313,9 @@ export function configureFloaty(
 /** Restores the initial store state. Intended for tests. */
 export function resetFloaty() {
   anchorStates.clear();
-  floatyStore.setState({ config: DEFAULT_CONFIG, anchors: {}, snapshots: {} });
+  anchorPriorities.clear();
+  for (const floatyId of [...releases.keys()]) cancelRelease(floatyId);
+  holders.clear();
+  warnedDuplicates.clear();
+  floatyStore.setState({ config: DEFAULT_CONFIG, anchors: {}, snapshots: {}, owners: {} });
 }

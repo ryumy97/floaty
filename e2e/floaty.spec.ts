@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import {
   expectAligned,
   expectSettled,
@@ -30,6 +30,25 @@ test.describe('positioning', () => {
     await switchLayout(page, 'list');
     await expectSettled(page, 'counter');
     await expect(counter.locator('.count')).toHaveText('2');
+  });
+
+  test('follows anchors moved by a sibling that neither resizes nor re-renders them', async ({
+    page,
+  }) => {
+    await switchLayout(page, 'list');
+    await expectSettled(page, 'counter');
+    const before = await page
+      .locator('[data-floaty-anchor="counter"]')
+      .evaluate((el) => el.getBoundingClientRect().y);
+
+    await page.getByRole('button', { name: 'Expand this row' }).click();
+    const after = await page
+      .locator('[data-floaty-anchor="counter"]')
+      .evaluate((el) => el.getBoundingClientRect().y);
+    expect(after - before).toBeGreaterThan(150);
+
+    await expectSettled(page, 'counter');
+    await expectSettled(page, 'player');
   });
 
   test('follows a layout shift caused by a viewport resize', async ({ page }) => {
@@ -183,13 +202,44 @@ test.describe('scrolling', () => {
   });
 });
 
-test.describe('known issues', () => {
+test.describe('content form during transitions', () => {
+  const player = (page: Page) =>
+    page.locator('[data-floaty="player"] .card.player');
+
+  test('switches form at take-off by default', async ({ page }) => {
+    await setDuration(page, 1500);
+    await switchLayout(page, 'sidebar');
+    await expect.poll(() => runningAnimations(page, 'player')).toBe(1);
+    await expect(player(page)).toHaveClass(/\bmini\b/);
+  });
+
+  test('can keep the old form until landing with settledState', async ({ page }) => {
+    await page.getByLabel('player switches form on landing').check();
+    await setDuration(page, 1500);
+    await switchLayout(page, 'sidebar');
+    await expect.poll(() => runningAnimations(page, 'player')).toBe(1);
+    await expect(player(page)).toHaveClass(/\bfull\b/);
+
+    await expectSettled(page, 'player');
+    await expect(player(page)).toHaveClass(/\bmini\b/);
+  });
+});
+
+test.describe('anchors mounting in a later commit', () => {
   test('animates into an anchor that mounts one commit later', async ({ page }) => {
-    test.fail(true, 'Same-commit invariant: see "Same-commit invariant is fragile" in TODO.md');
     await setDuration(page, 1500);
     await switchLayout(page, 'deferred');
     await expect(page.locator('[data-floaty-anchor="player"]')).toBeVisible();
 
     await expect.poll(() => runningAnimations(page, 'player'), { timeout: 1000 }).toBe(1);
+    await expectSettled(page, 'player');
+  });
+
+  test('hides once the grace period passes without a new anchor', async ({ page }) => {
+    await switchLayout(page, 'hidden');
+    await expect(page.locator('[data-floaty="player"]')).toHaveAttribute(
+      'data-floaty-state',
+      'hidden',
+    );
   });
 });

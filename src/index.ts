@@ -1,8 +1,11 @@
 export { Floaty } from './Floaty';
 export type { FloatyProps, FloatyRenderStatus } from './Floaty';
-export { useFloatyState } from './useFloatyState';
+export { useFloatyState, useFloatyTransition } from './useFloatyState';
+export type { FloatyTransitionStatus } from './useFloatyState';
 export { FloatyAnchor } from './FloatyAnchor';
 export type { FloatyAnchorProps } from './FloatyAnchor';
+export { createFloaty } from './createFloaty';
+export type { FloatyChannel } from './createFloaty';
 export { useFloaty } from './useFloaty';
 export type { FloatyStatus } from './useFloaty';
 export { configureFloaty, resetFloaty, DEFAULT_TRANSITION } from './store';
