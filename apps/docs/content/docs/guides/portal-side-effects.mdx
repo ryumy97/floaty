@@ -1,0 +1,31 @@
+---
+title: Portal side effects
+description: What changes because content is rendered outside the anchor.
+---
+
+Floating content is rendered into a layer at the end of `body` (DOM) from wherever
+`<Floaty>` is placed (React). It is never inside the anchor.
+
+| Tree | Parent of the content | Determines |
+| --- | --- | --- |
+| DOM | The layer at the end of `body` | CSS inheritance and selectors, native events, forms, inertness |
+| React | Wherever `<Floaty>` is rendered | Context, React events, error boundaries, `Suspense` |
+| Visual | The anchor's rect | Position and size only |
+
+## In practice
+
+- **CSS** inherits from `body` and the layer, not the anchor's ancestors. Theme classes,
+  CSS variables, fonts and colors set on a page wrapper don't reach the content, and
+  selectors like `.card:hover .title` or `@container` queries from the anchor's side don't
+  match. Use `configureFloaty({ layerClassName })`, `<Floaty className>`, or anchor `state`.
+- **React context and events** come from `<Floaty>`'s position in the React tree. Providers
+  and `onClick` handlers around the anchor don't see the content. Render `<Floaty>` under
+  the providers it needs.
+- **Native events and DOM checks** go through the layer to `body`. `anchorParent.contains(
+  target)` is `false` for the content, so click-outside handlers should also accept
+  `target.closest('[data-floaty]')`.
+- **Forms**: inputs aren't part of a `<form>` around the anchor; use the `form` attribute.
+- **Modals**: content anchored inside a modal `<dialog>` or popover is covered by the top
+  layer and inert. Render such content directly inside the dialog instead.
+- **`inert` and `aria-hidden`** on the anchor's ancestors don't affect the content.
+- **Focus order** follows the DOM, so floating content comes last when tabbing.

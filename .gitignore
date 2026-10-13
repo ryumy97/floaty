@@ -1,6 +1,10 @@
 node_modules
 dist
-demo-dist
+.next
+.source
+next-env.d.ts
+*.tsbuildinfo
+.turbo
 test-results
 playwright-report
 *.log

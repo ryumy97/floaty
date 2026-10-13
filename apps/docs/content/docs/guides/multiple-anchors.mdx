@@ -1,0 +1,45 @@
+---
+title: Multiple anchors
+description: Which anchor is active, and what happens between anchors.
+---
+
+## Choosing the active anchor
+
+Any number of anchors can share a `floatyId`; only one is active. It is the one with the
+highest `priority` (default `0`), and among equal priorities the most recently mounted one.
+When it unmounts, the next one by the same rule becomes active, and changing `priority`
+switches (and animates) to the new winner.
+
+"Most recently mounted" follows React's layout-effect order:
+
+- Anchors that mount together resolve by tree order: the later sibling wins, and a parent
+  wins over an anchor nested inside it.
+- An anchor whose `floatyId` changes, or that a React 19 `<Activity>` reveals, counts as
+  newly mounted.
+
+Set `priority` whenever two anchors can be mounted at once and the winner matters:
+
+```tsx
+<FloatyAnchor floatyId="player" priority={1} /> {/* detail view: always wins */}
+<FloatyAnchor floatyId="player" />              {/* list item */}
+```
+
+## Anchors that arrive late
+
+When the last anchor unmounts, the content stays where it was for `anchorGracePeriod` ms
+(default 150) before hiding. An anchor that mounts within that window, after a lazy route,
+a `Suspense` fallback or data loading, still animates from the old position instead of
+snapping. `useFloaty().hasAnchor` stays `true` during the window. Tune it with
+`configureFloaty({ anchorGracePeriod })`.
+
+## Keeping up with layout
+
+Anchors are re-measured on resize (`ResizeObserver`), on moves without resize such as an
+image loading above them (`IntersectionObserver`), on window resize, on any scroll, and
+whenever the anchor re-renders. `useFloaty(id).remeasure()` forces a re-measure for the
+rare cases these miss.
+
+## One Floaty per id
+
+Render one `<Floaty>` per `floatyId`. If several are mounted, only the first renders (a
+warning is logged in development); when it unmounts, the next one takes over.

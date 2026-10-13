@@ -1,0 +1,51 @@
+---
+title: Anchor state
+description: Let each layout tell the floating content how to render.
+---
+
+Each anchor can pass a `state` value to the floating content, so the same component can
+render or behave differently per layout while keeping its own React state:
+
+```tsx
+function Counter() {
+  const state = useFloatyState<{ step: number; compact?: boolean }>();
+  const [count, setCount] = useState(0); // preserved across layouts
+  return <button onClick={() => setCount((c) => c + (state?.step ?? 1))}>{count}</button>;
+}
+
+<Floaty floatyId="counter"><Counter /></Floaty>
+
+<FloatyAnchor floatyId="counter" state={{ step: 1 }} />                {/* grid */}
+<FloatyAnchor floatyId="counter" state={{ step: 10, compact: true }} /> {/* sidebar */}
+```
+
+There are three ways to read it:
+
+- **`useFloatyState<S>()`** inside the content. It throws if called outside `<Floaty>`
+  content.
+- **Render-function children** get it as an argument:
+  `<Floaty<PlayerState> floatyId="player">{(state) => <Player mode={state?.mode} />}</Floaty>`.
+- **`useFloaty<S>(floatyId).state`** anywhere else.
+
+The state switches in the same commit as the anchor, so content re-renders into its new
+form while it animates to the new position. Changing the `state` prop of the active anchor
+re-renders the content without moving it. State is compared shallowly, so inline object
+literals don't cause extra renders. While no anchor exists, the last active anchor's state
+is kept.
+
+## Switching form on landing
+
+If a form only fits the destination box (a mini player's controls, a compact card), switch
+it when the content lands instead of when it takes off. `useFloatyTransition<S>()` returns
+`{ state, settledState, isAnimating }`. `settledState` keeps the previous anchor's state for
+the whole transition and switches once the content lands (immediately if the move snaps):
+
+```tsx
+function Player() {
+  const { settledState } = useFloatyTransition<PlayerState>();
+  return <PlayerView mode={settledState?.mode ?? 'full'} />;
+}
+```
+
+Render-function children get it as `status.settledState`. Combine `state`, `settledState`
+and `isAnimating` for custom effects such as a cross-fade between forms.

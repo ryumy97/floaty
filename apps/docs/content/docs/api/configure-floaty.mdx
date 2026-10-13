@@ -1,0 +1,22 @@
+---
+title: configureFloaty
+description: Global options, applied immediately.
+---
+
+```ts
+configureFloaty({ zIndex: 1000, transition: { type: 'spring', duration: 400, bounce: 0.2 } });
+```
+
+| Option | Type | Default |
+| --- | --- | --- |
+| `zIndex` | `number`: z-index of the shared overlay layer | `1000` |
+| `transition` | Easing or spring ([Transitions](/docs/guides/transitions)) | `{ duration: 300, easing: 'ease-in-out' }` |
+| `layerClassName` | `string`: class on the overlay layer, for themes and inherited styles | |
+| `anchorGracePeriod` | `number`: ms the last anchor stays active after it unmounts; `0` releases immediately | `150` |
+
+Options can be changed at any time. `resetFloaty()` restores the initial state, which is
+useful between tests.
+
+The store is module-global: every React root on the page shares the same ids. An id's
+entry is dropped once no anchor, `Floaty` or `useFloaty` uses it, so dynamic ids don't
+leak.

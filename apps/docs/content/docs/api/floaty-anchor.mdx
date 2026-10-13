@@ -1,0 +1,20 @@
+---
+title: <FloatyAnchor>
+description: A placeholder that reserves layout space for the floating content.
+---
+
+```tsx
+<FloatyAnchor floatyId="player" state={{ mode: 'mini' }} style={{ height: 80 }} />
+```
+
+Renders a plain `div` and accepts all `div` props (including a native `id` and `ref`),
+plus:
+
+| Prop | Type | Default |
+| --- | --- | --- |
+| `floatyId` | `string` | required |
+| `state` | Any value, passed to the content while this anchor is active ([Anchor state](/docs/guides/anchor-state)). Compared shallowly. | |
+| `priority` | `number`: the highest priority among anchors with the same id is active ([Multiple anchors](/docs/guides/multiple-anchors)) | `0` |
+
+The anchor only reserves space; size it with CSS like any other element. The content is
+positioned and sized over it.

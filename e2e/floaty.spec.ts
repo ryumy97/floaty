@@ -9,10 +9,22 @@ import {
   useSpring,
 } from './helpers';
 
+let pageErrors: string[] = [];
+
 test.beforeEach(async ({ page }) => {
+  // Catches hydration mismatches and runtime errors, which only reach the console.
+  pageErrors = [];
+  page.on('pageerror', (error) => pageErrors.push(error.message));
+  page.on('console', (message) => {
+    if (message.type() === 'error') pageErrors.push(message.text());
+  });
   await page.goto('/');
   await expectSettled(page, 'player');
   await expectSettled(page, 'counter');
+});
+
+test.afterEach(() => {
+  expect(pageErrors).toEqual([]);
 });
 
 test.describe('positioning', () => {

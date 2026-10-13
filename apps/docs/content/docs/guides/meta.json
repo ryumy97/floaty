@@ -1,0 +1,12 @@
+{
+  "title": "Guides",
+  "pages": [
+    "anchor-state",
+    "transitions",
+    "multiple-anchors",
+    "typed-channels",
+    "self-measuring-content",
+    "nextjs",
+    "portal-side-effects"
+  ]
+}

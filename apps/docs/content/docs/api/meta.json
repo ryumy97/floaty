@@ -1,0 +1,4 @@
+{
+  "title": "API Reference",
+  "pages": ["floaty", "floaty-anchor", "hooks", "create-floaty", "configure-floaty"]
+}

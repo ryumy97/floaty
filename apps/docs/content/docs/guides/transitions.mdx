@@ -1,0 +1,43 @@
+---
+title: Transitions
+description: Easing curves, springs, and snapping.
+---
+
+`transition` is set globally with `configureFloaty` or per `<Floaty>`, and is one of:
+
+```ts
+false                                                     // snap (per Floaty only)
+{ duration?: 300, easing?: 'ease-in-out' }                // easing: any CSS easing
+{ type: 'spring', duration: 400, bounce?: 0 }             // spring, visual attributes
+{ type: 'spring', stiffness: 300, damping: 25, mass?: 1 } // spring, physical attributes
+```
+
+## Easing
+
+Any CSS easing string works (`ease-in-out`, `cubic-bezier(...)`, `linear(...)`). Objects
+without `type: 'spring'` are easing transitions; missing fields come from the global easing
+default (or `{ duration: 300, easing: 'ease-in-out' }` if the global default is a spring).
+
+## Springs
+
+- **Visual:** `duration` is the perceptual duration in ms (the spring's period). `bounce`
+  ranges from `-1` to `1`: `0` settles without overshoot, positive values bounce, negative
+  values are overdamped. The tail may run slightly past `duration`.
+- **Physical:** `stiffness`, `damping` and `mass` of a damped harmonic oscillator, with time
+  in seconds.
+- **`bounceSize`:** `false` (default) animates width and height with the same spring
+  critically damped, so the box never overshoots its size. Pass spring attributes to give
+  the size its own spring, for example
+  `{ type: 'spring', duration: 400, bounce: 0.3, bounceSize: { duration: 400, bounce: 0.1 } }`.
+
+Interruptions keep momentum with springs: a new anchor or a layout shift mid-flight
+continues from the current position and velocity.
+
+## When content animates
+
+- Switching anchors animates. So does the active anchor moving or resizing, unless
+  `animateLayoutChanges={false}`.
+- Scrolling never animates and never restarts a running transition.
+- `prefers-reduced-motion: reduce` turns every transition into a snap.
+- `onTransitionStart` and `onTransitionEnd` fire once per transition, even when it is
+  retargeted mid-flight.

@@ -1,0 +1,16 @@
+{
+  "name": "@floaty/e2e",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test:e2e": "playwright test",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@floaty/demo-next": "workspace:*",
+    "@floaty/demo-vite": "workspace:*",
+    "@playwright/test": "^1.63.0",
+    "@types/node": "catalog:",
+    "typescript": "catalog:"
+  }
+}

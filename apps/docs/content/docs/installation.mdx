@@ -1,0 +1,60 @@
+---
+title: Installation
+description: Add @floaty/react and float your first component.
+---
+
+```bash
+pnpm add @floaty/react
+```
+
+Peer dependencies: `react` and `react-dom` 18 or later.
+
+## Quick start
+
+Render the content once with `<Floaty>`, and place a `<FloatyAnchor>` with the same
+`floatyId` wherever it should appear:
+
+```tsx
+import { Floaty, FloatyAnchor } from '@floaty/react';
+import { useState } from 'react';
+
+function App() {
+  const [layout, setLayout] = useState<'grid' | 'list'>('grid');
+  return (
+    <>
+      <Floaty floatyId="player">
+        <VideoPlayer /> {/* never remounts */}
+      </Floaty>
+
+      {layout === 'grid' ? (
+        <Grid>
+          <FloatyAnchor floatyId="player" style={{ height: 320 }} />
+        </Grid>
+      ) : (
+        <List>
+          <FloatyAnchor floatyId="player" style={{ height: 80 }} />
+        </List>
+      )}
+    </>
+  );
+}
+```
+
+When `layout` changes, the grid's anchor unmounts and the list's mounts in the same commit.
+The player animates from one to the other, and because it is rendered by `<Floaty>` (not
+inside either anchor), it keeps playing.
+
+<Callout title="Where to put Floaty">
+  Render `<Floaty>` above everything that switches, for example in your app shell or root
+  layout. If it unmounts, its content does too.
+</Callout>
+
+## Global options
+
+```tsx
+import { configureFloaty } from '@floaty/react';
+
+configureFloaty({ zIndex: 1000, transition: { duration: 300, easing: 'ease-in-out' } });
+```
+
+See [`configureFloaty`](/docs/api/configure-floaty) for all options.

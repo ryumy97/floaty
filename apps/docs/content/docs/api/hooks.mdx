@@ -1,0 +1,33 @@
+---
+title: Hooks
+description: useFloaty, useFloatyState and useFloatyTransition.
+---
+
+## `useFloaty(floatyId)`
+
+Reads an id's status from any component.
+
+```ts
+const { hasAnchor, isAnimating, rect, state, remeasure } = useFloaty<PlayerState>('player');
+```
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `hasAnchor` | `boolean` | Whether an anchor for this id is mounted |
+| `isAnimating` | `boolean` | Whether the content is transitioning |
+| `rect` | `FloatyRect \| null` | Last known viewport rect of the active anchor |
+| `state` | `S \| undefined` | The active anchor's `state` (or the last active one's) |
+| `remeasure` | `() => void` | Forces a re-measure of the active anchor |
+
+A component re-renders only when a field it reads changes. Reading `rect` re-renders on
+every scroll frame; reading only `hasAnchor`, `isAnimating` or `state` does not.
+
+## `useFloatyState<S>()`
+
+Inside `<Floaty>` content, returns the active anchor's `state`. Throws outside content.
+
+## `useFloatyTransition<S>()`
+
+Inside `<Floaty>` content, returns `{ state, settledState, isAnimating }`. `state` switches
+when the transition starts; `settledState` switches when the content lands. See
+[Switching form on landing](/docs/guides/anchor-state#switching-form-on-landing).

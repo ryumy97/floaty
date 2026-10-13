@@ -1,0 +1,33 @@
+---
+title: Introduction
+description: Render content once, on top of the page, and let it follow layout placeholders while it keeps its state.
+---
+
+Floaty renders React content **on top of the screen** that follows layout placeholders, so
+the content **keeps its state** when the surrounding layout switches from one structure to
+another: grid to list, page to sidebar, expanded to mini player.
+
+<LayoutDemo />
+
+## How it works
+
+- `<Floaty floatyId="x">` renders its children once, into an overlay layer appended to
+  `document.body`. Place it somewhere that stays mounted when the layout changes, and its
+  children keep their state.
+- `<FloatyAnchor floatyId="x">` is a plain `div` placeholder that reserves space in your
+  layout. The floating content is positioned and sized over the active anchor.
+- When the active anchor changes, the content animates from its old rect to the new one
+  with an easing curve or a spring (via the Web Animations API), or snaps if transitions
+  are off or the user prefers reduced motion.
+- Content is positioned in document coordinates, so page scrolling moves it natively in the
+  same frame as the page.
+
+State is shared through a single [zustand](https://github.com/pmndrs/zustand) store, so no
+provider is needed.
+
+<Cards>
+  <Card title="Installation" href="/docs/installation" />
+  <Card title="Anchor state" href="/docs/guides/anchor-state" />
+  <Card title="Transitions" href="/docs/guides/transitions" />
+  <Card title="API reference" href="/docs/api/floaty" />
+</Cards>

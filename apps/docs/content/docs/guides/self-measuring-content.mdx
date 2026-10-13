@@ -1,0 +1,30 @@
+---
+title: Self-measuring content
+description: Charts, maps, canvases and video players that size themselves on mount.
+---
+
+By default (`keepMounted`), content mounts right away, hidden, so it can start work such as
+loading media before its first anchor appears. Before any anchor has been measured it has
+no size to take, so its box is `0 × 0`.
+
+Content that sizes itself from its container on mount (charts, maps, canvases, video
+players, virtualized lists) would then measure zero. Use `keepMounted="afterAnchor"`:
+
+```tsx
+<Floaty floatyId="chart" keepMounted="afterAnchor">
+  <Chart />
+</Floaty>
+```
+
+The content mounts once the first anchor has been measured, already at that anchor's size
+(even for layout effects in the content), and then stays mounted while no anchor exists,
+like the default.
+
+Hidden content always keeps the last known size, including when `<Floaty>` itself
+remounts.
+
+| `keepMounted` | Before the first anchor | While no anchor exists later |
+| --- | --- | --- |
+| `true` (default) | Mounted, hidden, `0 × 0` | Mounted, hidden, last size |
+| `'afterAnchor'` | Not mounted | Mounted, hidden, last size |
+| `false` | Not mounted | Not mounted (state is lost) |

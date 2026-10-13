@@ -1,0 +1,36 @@
+---
+title: <Floaty>
+description: Renders content once, on top of the page, over the active anchor.
+---
+
+```tsx
+<Floaty floatyId="player" transition={{ type: 'spring', duration: 400 }}>
+  <Player />
+</Floaty>
+```
+
+| Prop | Type | Default |
+| --- | --- | --- |
+| `floatyId` | `string` | required |
+| `children` | `ReactNode \| (state, { hasAnchor, isAnimating, settledState }) => ReactNode` | |
+| `transition` | `false`, easing or spring ([Transitions](/docs/guides/transitions)) | global default |
+| `keepMounted` | `true \| 'afterAnchor' \| false` ([Self-measuring content](/docs/guides/self-measuring-content)) | `true` |
+| `animateLayoutChanges` | `boolean`: also animate when the active anchor itself moves or resizes | `true` |
+| `className` / `style` | Styling of the visible box around `children` (avoid `transform`, `width`, `height`) | |
+| `onTransitionStart` / `onTransitionEnd` | `() => void` | |
+
+Render one `<Floaty>` per `floatyId`. If several are mounted, only the first renders.
+
+## Rendered DOM
+
+```html
+<div data-floaty="player" data-floaty-state="visible">  <!-- sits on the anchor's rect -->
+  <div data-floaty-content class="...">                 <!-- the visible, animating box -->
+    ...children
+  </div>
+</div>
+```
+
+`data-floaty-state` is `hidden`, `visible` or `animating`. While hidden, the outer element
+also gets `visibility: hidden` and `aria-hidden="true"`, keeping the content's state but
+removing it from the accessibility tree and from interaction.
