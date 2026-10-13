@@ -9,7 +9,6 @@
     "typecheck": "next typegen && tsc --noEmit"
   },
   "dependencies": {
-    "@floaty/demo-app": "workspace:*",
     "@floaty/react": "workspace:*",
     "next": "catalog:",
     "react": "catalog:",

@@ -42,10 +42,11 @@ positioning, animation or tracking in `packages/react/src/`, or the demos, also 
     `data-rect` and mocks `element.animate`.
   - Keep `react`, `react-dom`, and `zustand` external and the `'use client'` banner in the
     build (`vite.config.ts`).
-- `packages/demo-app/` (private): the shared playground `App`, exported as TypeScript
-  source. Both demos render it, and the e2e tests rely on its layouts and controls.
 - `apps/demo-vite/`, `apps/demo-next/` (private): the playground in Vite and in Next.js
-  (App Router). They consume `@floaty/react` through its built `dist/`, like a real app.
+  (App Router). Each has its own `App.tsx` and `styles.css` that import `@floaty/react`
+  directly, through its built `dist/`, like a real app. The e2e tests rely on their
+  layouts and controls, so keep the two `App.tsx` copies identical (the Next.js one only
+  adds `'use client'`).
 - `apps/docs/` (private): documentation site (Next.js + Fumadocs). Pages are MDX in
   `content/docs/`; live examples are components in `components/`, registered in
   `components/mdx.tsx`. Update the docs when the public API changes.

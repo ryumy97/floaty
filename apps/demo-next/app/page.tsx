@@ -1,4 +1,4 @@
-import { App } from '@floaty/demo-app';
+import { App } from './App';
 
 export default function Page() {
   return <App />;

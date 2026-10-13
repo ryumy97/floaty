@@ -839,8 +839,9 @@ Coverage by behavior:
 - rAF fallback (`tests/fallback.test.ts`): per-frame gap styles for easing and springs,
   resting styles restored on finish and cancel, no `onFinish` after cancel.
 
-**End-to-end (`e2e/`, Playwright, Chromium).** Both demo apps render the same playground
-(`packages/demo-app`), and the same specs run against each as a Playwright project:
+**End-to-end (`e2e/`, Playwright, Chromium).** Both demo apps contain the same playground
+(`App.tsx`), each importing `@floaty/react` itself, and the same specs run against each as
+a Playwright project:
 `vite` (`apps/demo-vite`, port 5199) and `next` (`apps/demo-next`, Next.js App Router, port
 5200). `e2e/playwright.config.ts` serves their production builds (Turborepo builds them
 first), and the tests drive the playground's layout buttons and transition controls. Every

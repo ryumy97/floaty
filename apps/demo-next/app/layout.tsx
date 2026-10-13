@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import '@floaty/demo-app/styles.css';
+import './styles.css';
 
 export const metadata = { title: 'Floaty playground (Next.js)' };
 

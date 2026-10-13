@@ -9,7 +9,6 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@floaty/demo-app": "workspace:*",
     "@floaty/react": "workspace:*",
     "react": "catalog:",
     "react-dom": "catalog:"

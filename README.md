@@ -17,7 +17,6 @@ Vue and Svelte bindings are planned; they will share a framework-agnostic `@floa
 ```text
 packages/
   react/         @floaty/react: the library, unit tests (Vitest + jsdom)
-  demo-app/      Shared playground app rendered by both demos (private)
 apps/
   demo-vite/     Playground on Vite              http://localhost:5199
   demo-next/     Playground on Next.js (App Router) http://localhost:5200
