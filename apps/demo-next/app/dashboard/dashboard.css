@@ -1,0 +1,170 @@
+.dash-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
+  gap: 16px;
+}
+
+.dash-anchor {
+  border-radius: 14px;
+  background: #ececf1;
+}
+
+.dash-anchor.card {
+  height: 240px;
+}
+
+.dash-anchor.large {
+  height: 440px;
+  margin-bottom: 20px;
+}
+
+.dash-anchor.rail {
+  height: 84px;
+}
+
+.dash-detail {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 24px;
+  align-items: start;
+}
+
+.dash-back {
+  display: inline-block;
+  margin-bottom: 12px;
+  color: #4f46e5 !important;
+}
+
+.dash-detail-title {
+  font-size: 20px;
+}
+
+.dash-rail-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Floating widgets, rendered in the overlay layer. */
+.dash-widget {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border-radius: 14px;
+  background: white;
+  color: #1d1d27;
+  font-family: system-ui, sans-serif;
+  box-shadow: 0 4px 18px rgb(0 0 0 / 8%);
+}
+
+.dash-main {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+}
+
+.dash-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.dash-head > div:first-child {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.dash-label {
+  display: block;
+  color: #6b6b7b;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.dash-value {
+  font-size: 28px;
+  font-variant-numeric: tabular-nums;
+}
+
+.dash-widget.large .dash-value {
+  font-size: 36px;
+}
+
+.dash-change {
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.dash-change.good {
+  color: #059669;
+}
+
+.dash-change.bad {
+  color: #dc2626;
+}
+
+.dash-ranges {
+  display: flex;
+  gap: 4px;
+}
+
+.dash-ranges button {
+  padding: 4px 10px;
+  font-size: 13px;
+}
+
+.dash-chart {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  margin-top: 12px;
+  overflow: visible;
+}
+
+.dash-line {
+  fill: none;
+  stroke: hsl(var(--hue) 70% 42%);
+  stroke-width: 2;
+}
+
+.dash-area {
+  fill: hsl(var(--hue) 70% 50% / 12%);
+}
+
+.dash-cursor {
+  stroke: #1d1d27;
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}
+
+.dash-hit {
+  position: absolute;
+  inset: 0;
+}
+
+.dash-rail {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  color: inherit;
+  text-decoration: none;
+}
+
+.dash-rail strong {
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+}
+
+.dash-rail .dash-chart {
+  height: 44px;
+  margin: 0;
+}

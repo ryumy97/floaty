@@ -19,9 +19,10 @@ packages/
   react/         @floaty/react: the library, unit tests (Vitest + jsdom)
 apps/
   demo-vite/     Playground on Vite              http://localhost:5199
-  demo-next/     Playground on Next.js (App Router) http://localhost:5200
+  demo-next/     Examples on Next.js (App Router)   http://localhost:5200
+                 (multi-page examples with client-side navigation)
   docs/          Documentation site (Next.js + Fumadocs) http://localhost:5300
-e2e/             Playwright specs, run against both demos
+e2e/             Playwright specs for both demos
 ```
 
 ## Development

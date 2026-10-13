@@ -42,16 +42,20 @@ positioning, animation or tracking in `packages/react/src/`, or the demos, also 
     `data-rect` and mocks `element.animate`.
   - Keep `react`, `react-dom`, and `zustand` external and the `'use client'` banner in the
     build (`vite.config.ts`).
-- `apps/demo-vite/`, `apps/demo-next/` (private): the playground in Vite and in Next.js
-  (App Router). Each has its own `App.tsx` and `styles.css` that import `@floaty/react`
-  directly, through its built `dist/`, like a real app. The e2e tests rely on their
-  layouts and controls, so keep the two `App.tsx` copies identical (the Next.js one only
-  adds `'use client'`).
+- `apps/demo-vite/`, `apps/demo-next/` (private): both import `@floaty/react` directly,
+  through its built `dist/`, like a real app.
+  - `apps/demo-vite/`: the one-page playground (`App.tsx`, `styles.css`), covered by
+    `e2e/floaty.spec.ts`, which relies on its layouts and controls.
+  - `apps/demo-next/` (App Router): the home page lists multi-page examples of client-side
+    navigation: `tube/` (covered by `e2e/navigation.spec.ts`) and `gallery/`, `homes/`,
+    `acme/`, `dashboard/`, `shop/` (covered by `e2e/examples.spec.ts`). They share
+    `ExampleHeader.tsx` and `example.css`; floating content renders outside the page, so
+    its CSS uses its own top-level classes.
 - `apps/docs/` (private): documentation site (Next.js + Fumadocs). Pages are MDX in
   `content/docs/`; live examples are components in `components/`, registered in
   `components/mdx.tsx`. Update the docs when the public API changes.
-- `e2e/` (private): Playwright specs, run against both demos as the `vite` and `next`
-  projects (`e2e/playwright.config.ts`). Tests fail on page errors and `console.error`.
+- `e2e/` (private): Playwright specs, run as the `vite` and `next` projects, each matching
+  its demo's specs (`e2e/playwright.config.ts`). Tests fail on page errors and `console.error`.
 
 Future framework packages (`@floaty/vue`, `@floaty/svelte`) go in `packages/`, after the
 framework-agnostic parts of `packages/react/src` move to a `@floaty/core` package.

@@ -1,0 +1,323 @@
+.shop-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 20px;
+}
+
+.shop-product {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.shop-product button {
+  margin-top: 6px;
+}
+
+.shop-art {
+  aspect-ratio: 1;
+  border-radius: 14px;
+  background:
+    radial-gradient(circle at 50% 58%, hsl(var(--hue) 45% 55%) 0 22%, transparent 23%),
+    linear-gradient(160deg, hsl(var(--hue) 40% 92%), hsl(calc(var(--hue) + 20) 35% 80%));
+}
+
+.shop-art.small {
+  width: 72px;
+  border-radius: 10px;
+}
+
+.shop-two-columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 380px;
+  gap: 32px;
+  align-items: start;
+}
+
+.shop-cart-items {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.shop-cart-items li {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px;
+  border-radius: 12px;
+  background: white;
+  border: 1px solid #e8e8ef;
+}
+
+.shop-cart-items li > div:nth-child(2) {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.shop-qty {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.shop-qty button {
+  width: 32px;
+  padding: 4px 0;
+}
+
+.shop-steps {
+  display: flex;
+  gap: 8px;
+  margin: 0 0 24px;
+  padding: 0;
+  list-style: none;
+  counter-reset: step;
+}
+
+.shop-steps li {
+  counter-increment: step;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: #ececf1;
+  color: #6b6b7b;
+  font-size: 14px;
+}
+
+.shop-steps li::before {
+  content: counter(step) '. ';
+}
+
+.shop-steps li[data-state='current'] {
+  background: #b45309;
+  color: white;
+}
+
+.shop-steps li[data-state='done'] {
+  color: #1d1d27;
+}
+
+.shop-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 420px;
+}
+
+.shop-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 14px;
+}
+
+.shop-form input {
+  padding: 8px 10px;
+  border: 1px solid #c9c9d6;
+  border-radius: 8px;
+  font: inherit;
+}
+
+.shop-form a {
+  color: #b45309 !important;
+}
+
+.shop-done {
+  display: grid;
+  justify-content: center;
+}
+
+.shop-pill-anchor {
+  width: 150px;
+  height: 36px;
+}
+
+.shop-summary-anchor {
+  border-radius: 16px;
+  background: #ececf1;
+}
+
+.shop-summary-anchor.cart {
+  height: 360px;
+}
+
+.shop-summary-anchor.checkout {
+  height: 300px;
+}
+
+.shop-summary-anchor.receipt {
+  width: min(440px, calc(100vw - 48px));
+  height: 380px;
+  margin-top: 24px;
+}
+
+/* The floating summary, rendered in the overlay layer. */
+.shop-summary {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border-radius: 16px;
+  background: white;
+  color: #1d1d27;
+  font-family: system-ui, sans-serif;
+  box-shadow: 0 6px 24px rgb(0 0 0 / 10%);
+  transition: border-radius 300ms ease;
+}
+
+.shop-summary.pill {
+  border-radius: 18px;
+  background: #1d1d27;
+  box-shadow: none;
+}
+
+.shop-pill {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: white;
+  font-size: 14px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+/* Laid out at its smallest full size, so it doesn't reflow while growing from the pill. */
+.shop-full {
+  position: absolute;
+  inset: 0;
+  min-width: 340px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 20px;
+  overflow-y: auto;
+}
+
+.shop-summary-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.shop-receipt-head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-align: center;
+}
+
+.shop-receipt-head span:last-child {
+  color: #6b6b7b;
+  font-size: 14px;
+}
+
+.shop-check {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: #059669;
+  color: white;
+  font-size: 22px;
+}
+
+.shop-lines {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 14px;
+}
+
+.shop-lines li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.shop-coupon {
+  display: flex;
+  gap: 8px;
+}
+
+.shop-coupon input {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 10px;
+  border: 1px solid #c9c9d6;
+  border-radius: 8px;
+  font: inherit;
+  font-size: 14px;
+}
+
+.shop-error {
+  margin: -8px 0 0;
+  color: #dc2626;
+  font-size: 13px;
+}
+
+.shop-totals {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 12px;
+  border-top: 1px solid #ececf1;
+  font-size: 14px;
+}
+
+.shop-totals div {
+  display: flex;
+  justify-content: space-between;
+}
+
+.shop-totals dd {
+  margin: 0;
+}
+
+.shop-discount {
+  color: #059669;
+}
+
+.shop-total {
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.shop-cta {
+  margin-top: auto;
+  padding: 10px;
+  border: none;
+  border-radius: 10px;
+  background: #b45309;
+  color: white;
+  font: inherit;
+  font-weight: 600;
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.shop-cta[aria-disabled='true'] {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.shop-link {
+  padding: 0;
+  border: none;
+  background: none;
+  color: #b45309;
+  font: inherit;
+  font-size: 14px;
+  text-decoration: none;
+  cursor: pointer;
+}

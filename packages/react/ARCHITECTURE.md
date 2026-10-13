@@ -839,14 +839,14 @@ Coverage by behavior:
 - rAF fallback (`tests/fallback.test.ts`): per-frame gap styles for easing and springs,
   resting styles restored on finish and cancel, no `onFinish` after cancel.
 
-**End-to-end (`e2e/`, Playwright, Chromium).** Both demo apps contain the same playground
-(`App.tsx`), each importing `@floaty/react` itself, and the same specs run against each as
-a Playwright project:
-`vite` (`apps/demo-vite`, port 5199) and `next` (`apps/demo-next`, Next.js App Router, port
-5200). `e2e/playwright.config.ts` serves their production builds (Turborepo builds them
-first), and the tests drive the playground's layout buttons and transition controls. Every
-test also fails on a page error or `console.error`, which catches hydration mismatches in
-the Next.js demo. Alignment is checked by comparing the inner box's `getBoundingClientRect()` with the
+**End-to-end (`e2e/`, Playwright, Chromium).** Each demo app imports `@floaty/react`
+itself and is a Playwright project running its own specs: `vite` (`apps/demo-vite`, port
+5199, the one-page playground, `floaty.spec.ts`) and `next` (`apps/demo-next`, Next.js App
+Router, port 5200, multi-page examples, `navigation.spec.ts` and `examples.spec.ts`).
+`e2e/playwright.config.ts` serves their production builds (Turborepo builds them first);
+the playground tests drive its layout buttons and transition controls. Every test also
+fails on a page error or `console.error`, which catches hydration mismatches in the
+Next.js demo. Alignment is checked by comparing the inner box's `getBoundingClientRect()` with the
 active anchor's (within 1 px), and running transitions through `element.getAnimations()`.
 
 - Rest alignment, component state kept across layouts, layout shift from a viewport
@@ -865,11 +865,23 @@ active anchor's (within 1 px), and running transitions through `element.getAnima
 
 - Native scrolling: alignment is checked in the same task as `window.scrollBy`, before any
   rAF or re-measure, for page anchors (document placement, outer transform unchanged
-  afterwards) and for anchors in the demo's fixed `dock`; animating between page and fixed
+  afterwards) and for   anchors in the demo's fixed `dock`; animating between page and fixed
   anchors after scrolling.
+- Client-side navigation (`e2e/navigation.spec.ts`, `next` project only) against the
+  Next.js demo's `/tube` example, where one `Floaty` lives in a route layout and pages
+  render its anchors: the player flies between the watch page's anchor and a fixed
+  mini-player anchor (a lower-`priority` fallback in the layout) without remounting;
+  switching videos through a `loading.tsx` that renders the same anchor keeps it in place;
+  theater mode animates a layout change; closing the mini player hides it.
+- The other Next.js examples (`e2e/examples.spec.ts`, `next` project only), each with one
+  or more `Floaty`s in a route layout, checked to land on the right anchor and not remount:
+  per-photo dynamic ids flying into a modal from intercepting and parallel routes and back
+  (`/gallery`); a map keeping its pan and zoom across pages, re-centered by anchor state
+  (`/homes`); a chat keeping messages and an input draft from a resizing dock anchor to a
+  page (`/acme`); several widgets moving at once between grid, detail and rail
+  (`/dashboard`); an order summary through a multi-step checkout (`/shop`).
 
-Not covered yet: WebKit and Firefox, frame-level smoothness of the JS-tracked cases, and
-Next.js client-side navigation between routes (the Next.js demo is a single page).
+Not covered yet: WebKit and Firefox, and frame-level smoothness of the JS-tracked cases.
 
 ## 16. Build and packaging
 

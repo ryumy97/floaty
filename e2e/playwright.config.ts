@@ -1,9 +1,17 @@
 import { defineConfig, devices } from '@playwright/test';
 
-/** The same specs run against every demo app, on its production build. */
+/**
+ * Each demo app runs its own specs, on its production build: the Vite demo is the one-page
+ * playground, the Next.js demo has the multi-page examples.
+ */
 const DEMOS = [
-  { name: 'vite', filter: '@floaty/demo-vite', port: 5199 },
-  { name: 'next', filter: '@floaty/demo-next', port: 5200 },
+  { name: 'vite', filter: '@floaty/demo-vite', port: 5199, testMatch: ['floaty.spec.ts'] },
+  {
+    name: 'next',
+    filter: '@floaty/demo-next',
+    port: 5200,
+    testMatch: ['navigation.spec.ts', 'examples.spec.ts'],
+  },
 ];
 
 export default defineConfig({
@@ -16,8 +24,9 @@ export default defineConfig({
     reducedMotion: 'no-preference',
     trace: 'retain-on-failure',
   },
-  projects: DEMOS.map(({ name, port }) => ({
+  projects: DEMOS.map(({ name, port, testMatch }) => ({
     name,
+    testMatch,
     use: { ...devices['Desktop Chrome'], baseURL: `http://localhost:${port}` },
   })),
   webServer: DEMOS.map(({ filter, port }) => ({
