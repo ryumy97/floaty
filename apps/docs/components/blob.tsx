@@ -3,7 +3,7 @@
 import { createFloaty } from '@floaty/react';
 import type { ReactNode } from 'react';
 
-const blob = createFloaty<{ children: ReactNode }>('greatest-blob');
+const blob = createFloaty<{ children: ReactNode }>('blob');
 
 const Content = () => {
   const state = blob.useFloatyState();

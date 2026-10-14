@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Floaty, FloatyAnchor, useFloatyState } from '@floaty/react';
+import { type ReactNode, useEffect, useState } from 'react';
 import { BlobAnchor } from './blob';
 
 const MAX_COLS = 12;
@@ -47,8 +48,14 @@ function Stepper({
   );
 }
 
+const FloatContent = () => {
+  const state = useFloatyState<{ children: ReactNode }>();
+
+  return <div className="size-4">{state?.children}</div>;
+};
+
 /** Live example: one stateful button following two different layouts. */
-export function LayoutDemo() {
+export function LayoutDemo({ id }: { id?: string }) {
   const [cols, setCols] = useState(2);
   const [rows, setRows] = useState(2);
   const [position, setPosition] = useState<Position | null>(null);
@@ -69,8 +76,26 @@ export function LayoutDemo() {
 
   return (
     <>
+      {id && (
+        <Floaty
+          floatyId={id}
+          className="flex size-full items-center justify-center rounded-2xl bg-float font-medium text-float-foreground shadow-float"
+          transition={{ type: 'spring', duration: 450, bounce: 0.2 }}
+        >
+          <FloatContent />
+        </Floaty>
+      )}
       <div className="relative w-full flex items-center justify-center h-4">
-        {!position && <BlobAnchor state={{ children: <div className="" /> }} className="size-4" />}
+        {id && !position && (
+          <FloatyAnchor
+            floatyId={id}
+            state={{ children: <div className="" /> }}
+            className="size-4"
+          />
+        )}
+        {!id && !position && (
+          <BlobAnchor state={{ children: <div className="" /> }} className="size-4" />
+        )}
       </div>
       <div className="not-prose my-6 rounded-xl border bg-fd-card p-4">
         <div className="mb-4 flex flex-wrap gap-6">
@@ -105,8 +130,15 @@ export function LayoutDemo() {
                 className="relative h-40 rounded-2xl border-[1.5px] border-dashed border-anchor bg-anchor-fill font-mono text-sm text-fd-muted-foreground tabular-nums transition-colors hover:border-float/60 cursor-pointer"
               >
                 {index}
-                {position?.x === x && position.y === y && (
+                {!id && position?.x === x && position.y === y && (
                   <BlobAnchor
+                    state={{ children: <>{index}</> }}
+                    className="absolute inset-0 size-full"
+                  />
+                )}
+                {id && position?.x === x && position.y === y && (
+                  <FloatyAnchor
+                    floatyId={id}
                     state={{ children: <>{index}</> }}
                     className="absolute inset-0 size-full"
                   />
