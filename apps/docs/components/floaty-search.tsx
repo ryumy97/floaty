@@ -12,7 +12,6 @@ import { FileText, Hash, Search, Text } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import {
   type KeyboardEvent,
-  type RefObject,
   useEffect,
   useId,
   useLayoutEffect,
@@ -22,6 +21,7 @@ import {
 } from 'react';
 import { createPortal } from 'react-dom';
 import { cn } from '@/lib/cn';
+import { useDisplayed } from '@/lib/use-displayed';
 
 type Form = 'bar' | 'icon' | 'dialog';
 
@@ -30,23 +30,6 @@ const search = createFloaty<{ form: Form; round?: boolean }>('docs-search');
 
 const HEADER = 48;
 const MAX_LIST = 400;
-
-/**
- * Layouts render both triggers and hide one with CSS per breakpoint, so the displayed one
- * takes priority over the hidden one.
- */
-function useDisplayed(ref: RefObject<HTMLElement | null>) {
-  const [displayed, setDisplayed] = useState(false);
-  useLayoutEffect(() => {
-    const el = ref.current!;
-    const update = () => setDisplayed(el.getClientRects().length > 0);
-    update();
-    const observer = new ResizeObserver(update);
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [ref]);
-  return displayed;
-}
 
 function TriggerAnchor({ form, className }: { form: Form; className?: string }) {
   const ref = useRef<HTMLDivElement>(null);

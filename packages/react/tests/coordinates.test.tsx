@@ -9,7 +9,13 @@ const layer = () => document.querySelector<HTMLElement>('[data-floaty-layer]')!;
 /** Simulates the page being scrolled down by `y` px: the layer's origin moves up. */
 const scrollPage = (y: number) => layer().setAttribute('data-rect', `0,${-y},0,0`);
 
-function App({ where, transition = false }: { where: 'page' | 'fixed'; transition?: boolean }) {
+function App({
+  where,
+  transition = false,
+}: {
+  where: 'page' | 'fixed' | 'sticky';
+  transition?: boolean;
+}) {
   return (
     <>
       <Floaty floatyId="c" transition={transition ? { duration: 300, easing: 'linear' } : false}>
@@ -21,6 +27,11 @@ function App({ where, transition = false }: { where: 'page' | 'fixed'; transitio
       {where === 'fixed' && (
         <div style={{ position: 'fixed' }}>
           <FloatyAnchor floatyId="c" data-testid="anchor" data-rect="0,0,100,50" />
+        </div>
+      )}
+      {where === 'sticky' && (
+        <div style={{ position: 'sticky', top: 0 }}>
+          <FloatyAnchor floatyId="c" data-testid="anchor" data-rect="0,60,100,50" />
         </div>
       )}
     </>
@@ -52,6 +63,26 @@ describe('coordinates', () => {
     act(() => floatyStore.getState().measure('c', 'layout'));
     expect(outer().style.position).toBe('fixed');
     expect(outer().style.transform).toBe('translate3d(0px, 0px, 0)');
+  });
+
+  it('keeps anchors inside a stuck sticky container on screen while the page scrolls', () => {
+    render(<App where="sticky" />);
+    expect(outer().style.position).toBe('fixed');
+    expect(outer().style.transform).toBe('translate3d(0px, 60px, 0)');
+
+    // Stuck: the page scrolls but the anchor's viewport rect stays the same.
+    scrollPage(300);
+    act(() => floatyStore.getState().measure('c', 'scroll'));
+    expect(outer().style.position).toBe('fixed');
+    expect(outer().style.transform).toBe('translate3d(0px, 60px, 0)');
+  });
+
+  it('follows a sticky container that is not stuck yet as the page scrolls', () => {
+    render(<App where="sticky" />);
+    scrollPage(40);
+    screen.getByTestId('anchor').setAttribute('data-rect', '0,20,100,50');
+    act(() => floatyStore.getState().measure('c', 'scroll'));
+    expect(outer().style.transform).toBe('translate3d(0px, 20px, 0)');
   });
 
   it('animates the on-screen gap when switching between fixed and page anchors', () => {

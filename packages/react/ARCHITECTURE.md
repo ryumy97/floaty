@@ -410,14 +410,20 @@ It is exposed through `useFloatyTransition()` and the render-function status.
 | Placement | When | Outer element | Target |
 | --- | --- | --- | --- |
 | Document | default | `position: absolute` inside the layer | `relativeTo(anchorRect, layerRect)`: anchor minus layer origin, i.e. document coordinates |
-| Fixed | the anchor or an ancestor has computed `position: fixed` | `position: fixed` | the anchor's viewport rect |
+| Fixed | the anchor or an ancestor has computed `position: fixed` or `position: sticky` | `position: fixed` | the anchor's viewport rect |
 
 - **Why:** browsers scroll the page on the compositor thread, ahead of JavaScript. With
   document placement the page scroll moves the layer and the anchor equally, so the
   target does not change and the content scrolls natively in the same frame as the page.
   Anchors in fixed containers do not move with the page, so their floaties are fixed too.
-  JavaScript re-measurement is only needed when the anchor moves *relative to its
-  placement*: nested scroll containers, sticky anchors while stuck, layout shifts.
+- **Sticky containers use fixed placement** because a stuck sticky anchor keeps the same
+  viewport rect while the page scrolls: the store's re-measure sees no change, so a
+  document-placed floaty would scroll away with the page and never be corrected. With
+  fixed placement the stuck phase needs no update at all; while the container is not
+  stuck yet, it scrolls with the page, its viewport rect changes, and the scroll
+  re-measure follows it.
+- JavaScript re-measurement is only needed when the anchor moves *relative to its
+  placement*: nested scroll containers, sticky anchors before they stick, layout shifts.
 - The placement is re-evaluated (an ancestor walk with `getComputedStyle`) when the anchor
   changes or on `layout` measurements, never on scroll. Switching placement only changes
   the outer element's CSS `position`, so no DOM node moves and iframe/video state is kept.
@@ -683,7 +689,7 @@ heavy content, a future `sizeMode: 'scale'` option could animate `scale` instead
 | --- | --- |
 | Global namespace | One store per JS module instance: all React roots share `floatyId`s. Use distinct ids per micro-frontend. |
 | Not clipped by scroll containers | Content lives in a body-level overlay, so it can visually escape `overflow: hidden` ancestors of the anchor while they scroll. Use `useFloaty().rect` to implement custom clipping or hide when out of view. |
-| JS-tracked cases can lag a frame | Nested scroll containers and sticky anchors while stuck move relative to the floaty's placement, so they still follow via a rAF re-measure, which can trail compositor scrolling by a frame. Page scroll and fixed containers are native. |
+| JS-tracked cases can lag a frame | Nested scroll containers and sticky anchors before they stick move relative to the floaty's placement, so they follow via a rAF re-measure, which can trail compositor scrolling by a frame. Page scroll, fixed containers and stuck sticky containers are native. |
 | Document scroll area | Floaties are absolutely positioned in the document, so one placed beyond the document's end (for example, over an anchor scrolled out of a nested container near the bottom of the page, or overshooting with a spring) can extend the page's scrollable area while it is there. |
 | Transformed `html`/`body` | A `transform`, `filter` or `contain` on `html` or `body` makes them the containing block for fixed elements, so fixed placement would be offset. |
 | Moves during scrolling snap | Moves without resize are detected by the move observer (section 6.2), but one reported within 100 ms of a scroll is treated as part of the scroll and snaps. Without `IntersectionObserver`, such moves are not detected; call `useFloaty(id).remeasure()`. |
@@ -840,7 +846,9 @@ Coverage by behavior:
   but not anchor ancestors, and the content sits outside the anchor in the DOM.
 - Coordinates (`tests/coordinates.test.tsx`): absolute layer at the document origin;
   page anchors in document coordinates (unchanged target after page scroll); anchors in
-  fixed containers use fixed placement and viewport coordinates; switching between them
+  fixed containers use fixed placement and viewport coordinates; anchors in sticky
+  containers too, staying on screen while stuck and following the re-measure before they
+  stick; switching between them
   after scrolling animates the on-screen gap.
 - Layer swap (`tests/layerSwap.test.tsx`): a mounted `Floaty` whose layer is recreated
   positions its new outer element (the StrictMode hydration replay, driven through a mocked
@@ -1006,15 +1014,17 @@ Not covered yet: WebKit and Firefox, and frame-level smoothness of the JS-tracke
 
 - **Decision:** make the overlay layer `position: absolute` at the document origin instead
   of `position: fixed`, and give each floaty's outer element `position: fixed` (viewport
-  coordinates) only while its anchor is inside a fixed container.
+  coordinates) only while its anchor is inside a fixed or sticky container.
 - **Why:** with a fixed layer every page scroll had to be followed from JavaScript, which
   trails the compositor-driven scroll by a frame (visible lag and jitter, especially with
   momentum scrolling on mobile and trackpads). In document coordinates, page scroll moves
   the content natively. A floaty can never move between layers (moving DOM would reload
   iframes and interrupt media), so the placement is switched with CSS on the outer element
   instead.
-- **Consequence:** nested scroll containers and stuck sticky anchors are still followed
-  from JavaScript; floaties beyond the document's end can extend the scrollable area; a
+- **Consequence:** nested scroll containers and sticky anchors that have not stuck yet are
+  still followed from JavaScript (sticky containers originally used document placement,
+  which left stuck anchors behind: their viewport rect never changes, so nothing
+  re-measured); floaties beyond the document's end can extend the scrollable area; a
   transformed `html`/`body` breaks fixed placement (section 12).
 
 ### ADR-9: Typed channels as thin bindings

@@ -1,33 +1,56 @@
 ---
 title: Introduction
-description: Render content once, on top of the page, and let it follow layout placeholders while it keeps its state.
+description: Move a component between layouts without remounting it, and animate the move.
 ---
 
-Floaty renders React content **on top of the screen** that follows layout placeholders, so
-the content **keeps its state** when the surrounding layout switches from one structure to
-another: grid to list, page to sidebar, expanded to mini player.
+Floaty lets one React component **move between places in your layout without remounting**.
+You can make a video keep playing, a form keep its input and a map keep its tiles, 
+while the component moves from where it was to where it is now.
 
-<LayoutDemo id="intro-float" />
+## The problem
+
+In React, where a component sits in the tree decides its lifetime. 
+Move it to a different parent and React unmounts the old instance and mounts a new one:
+
+```tsx
+{isMini ? (
+  <Sidebar>
+    <VideoPlayer /> {/* a new player: playback restarts, buffering starts over */}
+  </Sidebar>
+) : (
+  <Grid>
+    <VideoPlayer />
+  </Grid>
+)}
+```
+
+In many cases, you want to keep the component live and visible, 
+then move and fit to new locations when the layout changes.
 
 ## How it works
 
-- `<Floaty floatyId="x">` renders its children once, into an overlay layer appended to
-  `document.body`. Place it somewhere that stays mounted when the layout changes, and its
-  children keep their state.
-- `<FloatyAnchor floatyId="x">` is a plain `div` placeholder that reserves space in your
-  layout. The floating content is positioned and sized over the active anchor.
-- When the active anchor changes, the content animates from its old rect to the new one
-  with an easing curve or a spring (via the Web Animations API), or snaps if transitions
-  are off or the user prefers reduced motion.
-- Content is positioned in document coordinates, so page scrolling moves it natively in the
-  same frame as the page.
+Floaty components separate **what** is rendered from **where** it appears:
 
-State is shared through a single [zustand](https://github.com/pmndrs/zustand) store, so no
-provider is needed.
+- `<Floaty>` renders your component **once**, in a layer on top of the page. Put it
+  somewhere that never unmounts, like your app shell, and its state survives every layout
+  change.
+- `<FloatyAnchor>` is an empty placeholder you put in your layouts. It reserves the space,
+  and the floating component is drawn exactly over whichever anchor is on screen.
+
+When the active anchor changes, the component springs from the old spot to the new one.
+
+<LayoutDemo id="intro-float" />
+
+- **State that survives layout changes**, including across page navigations in Next.js.
+- **Smooth transitions** with springs or easing, interruptible mid-flight, and skipped for
+  users who prefer reduced motion.
+- **Per-place variations** through anchor `state`: the same player can show full controls
+  in the grid and compact ones in the sidebar.
+- **Native scroll performance**: floating content moves with the page in the same frame.
 
 <Cards>
-  <Card title="Installation" href="/docs/installation" />
-  <Card title="Anchor state" href="/docs/guides/anchor-state" />
-  <Card title="Transitions" href="/docs/guides/transitions" />
-  <Card title="API reference" href="/docs/api/floaty" />
+  <Card title="Installation" description="Add the package and float your first component." href="/docs/installation" />
+  <Card title="Anchor state" description="Adapt the content to each place it lands." href="/docs/guides/anchor-state" />
+  <Card title="Transitions" description="Springs, easing and snapping." href="/docs/guides/transitions" />
+  <Card title="API reference" description="Every prop and hook." href="/docs/api/floaty" />
 </Cards>

@@ -171,11 +171,15 @@ export function Floaty<S = unknown>({
     const { config, animateLayoutChanges, onTransitionStart, onTransitionEnd } = latest.current;
     const sameAnchor = prevAnchor === anchor;
     const layerRect = measureElement(layer);
-    // Anchors inside a fixed container don't move with the page, so the outer
-    // element is fixed too and uses viewport coordinates; everything else uses
-    // document coordinates (relative to the absolute layer).
+    // Anchors inside a fixed or sticky container don't move with the page (a stuck
+    // sticky container keeps the same viewport rect, so no re-measure would notice
+    // the page scrolling), so the outer element is fixed too and uses viewport
+    // coordinates; everything else uses document coordinates (relative to the
+    // absolute layer).
     const fixed =
-      prevTarget && sameAnchor && reason !== 'layout' ? prevTarget.fixed : inFixedContainer(anchor);
+      prevTarget && sameAnchor && reason !== 'layout'
+        ? prevTarget.fixed
+        : inViewportContainer(anchor);
     const next: Placement = { rect: fixed ? rect : relativeTo(rect, layerRect), fixed };
     lastTargetRef.current = next;
     if (!prevTarget || prevTarget.fixed !== fixed)
@@ -334,9 +338,15 @@ function toViewport({ rect, fixed }: Placement, layerRect: FloatyRect): FloatyRe
   return fixed ? rect : { ...rect, x: rect.x + layerRect.x, y: rect.y + layerRect.y };
 }
 
-function inFixedContainer(el: Element): boolean {
+/**
+ * Whether the element sits in a fixed or sticky container. While a sticky container
+ * is not stuck it scrolls with the page, which changes the anchor's viewport rect,
+ * so the scroll re-measure keeps fixed placement in sync.
+ */
+function inViewportContainer(el: Element): boolean {
   for (let node: Element | null = el; node; node = node.parentElement) {
-    if (getComputedStyle(node).position === 'fixed') return true;
+    const { position } = getComputedStyle(node);
+    if (position === 'fixed' || position === 'sticky') return true;
   }
   return false;
 }
