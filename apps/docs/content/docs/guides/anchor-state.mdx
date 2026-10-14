@@ -4,20 +4,17 @@ description: Let each layout tell the floating content how to render.
 ---
 
 Each anchor can pass a `state` value to the floating content, so the same component can
-render or behave differently per layout while keeping its own React state:
+render or behave differently per layout while keeping its own React state.
 
-```tsx
-function Counter() {
-  const state = useFloatyState<{ step: number; compact?: boolean }>();
-  const [count, setCount] = useState(0); // preserved across layouts
-  return <button onClick={() => setCount((c) => c + (state?.step ?? 1))}>{count}</button>;
-}
+In the example below, the main area's anchor passes `{ color: '#4f46e5' }` and the
+sidebar's passes `{ color: '#0d9488' }`. The counter reads it with `useFloatyState` and
+turns indigo or teal depending on where it lands, while the count itself is kept:
 
-<Floaty floatyId="counter"><Counter /></Floaty>
+<include>../../../components/examples/anchor-state.tsx#example</include>
 
-<FloatyAnchor floatyId="counter" state={{ step: 1 }} />                {/* grid */}
-<FloatyAnchor floatyId="counter" state={{ step: 10, compact: true }} /> {/* sidebar */}
-```
+<Preview>
+  <AnchorState />
+</Preview>
 
 There are three ways to read it:
 
@@ -27,25 +24,28 @@ There are three ways to read it:
   `<Floaty<PlayerState> floatyId="player">{(state) => <Player mode={state?.mode} />}</Floaty>`.
 - **`useFloaty<S>(floatyId).state`** anywhere else.
 
-The state switches in the same commit as the anchor, so content re-renders into its new
-form while it animates to the new position. Changing the `state` prop of the active anchor
-re-renders the content without moving it. State is compared shallowly, so inline object
-literals don't cause extra renders. While no anchor exists, the last active anchor's state
-is kept.
-
 ## Switching form on landing
 
-If a form only fits the destination box (a mini player's controls, a compact card), switch
-it when the content lands instead of when it takes off. `useFloatyTransition<S>()` returns
-`{ state, settledState, isAnimating }`. `settledState` keeps the previous anchor's state for
-the whole transition and switches once the content lands (immediately if the move snaps):
+If a form only fits the destination box, switch it when the content lands instead of when it takes off. 
+`useFloatyTransition<S>()` returns `{ state, settledState, isAnimating }`. 
+`settledState` keeps the previous anchor's state for the whole transition 
+and switches once the content lands (immediately if the move snaps).
 
-```tsx
-function Player() {
-  const { settledState } = useFloatyTransition<PlayerState>();
-  return <PlayerView mode={settledState?.mode ?? 'full'} />;
-}
-```
+The two hooks can also be combined so the timing depends on the direction. 
 
-Render-function children get it as `status.settledState`. Combine `state`, `settledState`
-and `isAnimating` for custom effects such as a cross-fade between forms.
+<include>../../../components/examples/switch-on-landing.tsx#example</include>
+
+<Preview>
+  <SwitchOnLanding />
+</Preview>
+
+The counter below shows "Clicked n times" in the main area and only the number in the small sidebar slot, 
+and the full label never fits a box smaller than the main area:
+
+- **To the sidebar** (`compact` false to true), it switches **at take-off**, reading
+  `state`, so the label is already short while the box shrinks.
+- **Back to the main area** (`compact` true to false), it switches **on landing**, reading
+  `settledState`, so the label stays short until the box has grown.
+
+`state?.compact || settledState?.compact` does both: it is compact as soon as either the
+destination or the resting place is the sidebar:
