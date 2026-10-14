@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { useLayoutEffect, useState } from 'react';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { Floaty, FloatyAnchor, useFloaty, type FloatyProps } from '../src';
+import { Floaty, FloatyAnchor, type FloatyProps, useFloaty } from '../src';
 import { animations, endGracePeriod } from './setup';
 
 const measured: Array<{ width: string; height: string }> = [];

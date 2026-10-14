@@ -309,6 +309,12 @@ Only the **active** anchor installs listeners, so the cost is per `floatyId`, no
      the anchor already positioned (scroll, layout shifts) directly, without a render.
      It ignores snapshots whose anchor differs from the last positioned one.
 
+   When the outer element itself is new (the layer was recreated while `Floaty` stayed
+   mounted, for example by a StrictMode effect replay during hydration, which can commit a
+   render into the first layer before the portal moves to the second), the previous target
+   is forgotten so the new element is placed from scratch instead of being skipped as
+   "already on target".
+
 Positioning is applied **imperatively** (outer: `transform`, `width`, `height`,
 `visibility`, `data-floaty-state`; inner: animations only) rather than through React's
 `style` prop. That keeps high-frequency updates (scroll) out of React reconciliation, and
@@ -464,7 +470,7 @@ flowchart TD
   hasAnchor -- no --> hide["stop motion, set hidden"] --> done
   hasAnchor -- yes --> offset["OFFSET: write target to outer"]
   offset --> retarget{"anchor switched or animated layout shift (7.3)?"}
-  retarget -- no --> keep["keep any running motion; visible if at rest"] --> done
+  retarget -- no --> keep["keep any running motion (stop it if there was no previous target); visible if at rest"] --> done
   retarget -- yes --> gap["gap = current gap + prev target - new target"]
   gap --> curve{"animate and curve has duration?"}
   curve -- no --> snap["cancel motion, visible, end interrupted transition"] --> done
@@ -836,6 +842,9 @@ Coverage by behavior:
   page anchors in document coordinates (unchanged target after page scroll); anchors in
   fixed containers use fixed placement and viewport coordinates; switching between them
   after scrolling animates the on-screen gap.
+- Layer swap (`tests/layerSwap.test.tsx`): a mounted `Floaty` whose layer is recreated
+  positions its new outer element (the StrictMode hydration replay, driven through a mocked
+  `useFloatyLayer` because `act()` batches those commits in jsdom).
 - rAF fallback (`tests/fallback.test.ts`): per-frame gap styles for easing and springs,
   resting styles restored on finish and cancel, no `onFinish` after cancel.
 

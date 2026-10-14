@@ -65,9 +65,7 @@ describe('anchor order without priority', () => {
   });
 
   it('moves a re-registered anchor to the top (floatyId change)', () => {
-    const { rerender } = render(
-      <App anchors={[{ name: 'a' }, { name: 'b' }]} />,
-    );
+    const { rerender } = render(<App anchors={[{ name: 'a' }, { name: 'b' }]} />);
     rerender(<App anchors={[{ name: 'a', floatyId: 'other' }, { name: 'b' }]} />);
     rerender(<App anchors={[{ name: 'a' }, { name: 'b' }]} />);
     expect(active()).toBe('a');
@@ -89,13 +87,25 @@ describe('anchor priority', () => {
 
   it('breaks ties by mount order', () => {
     const { rerender } = render(<App anchors={[{ name: 'a', priority: 1 }]} />);
-    rerender(<App anchors={[{ name: 'a', priority: 1 }, { name: 'b', priority: 1 }]} />);
+    rerender(
+      <App
+        anchors={[
+          { name: 'a', priority: 1 },
+          { name: 'b', priority: 1 },
+        ]}
+      />,
+    );
     expect(active()).toBe('b');
   });
 
   it('falls back to the highest remaining priority, not the most recent', () => {
     const { rerender } = render(
-      <App anchors={[{ name: 'a', priority: 2 }, { name: 'c', priority: 1 }]} />,
+      <App
+        anchors={[
+          { name: 'a', priority: 2 },
+          { name: 'c', priority: 1 },
+        ]}
+      />,
     );
     rerender(
       <App anchors={[{ name: 'a', priority: 2 }, { name: 'c', priority: 1 }, { name: 'b' }]} />,
@@ -115,7 +125,14 @@ describe('anchor priority', () => {
 
   it('keeps a re-registered lower-priority anchor from taking over', () => {
     const { rerender } = render(<App anchors={[{ name: 'a', priority: 1 }, { name: 'b' }]} />);
-    rerender(<App anchors={[{ name: 'a', priority: 1 }, { name: 'b', floatyId: 'other' }]} />);
+    rerender(
+      <App
+        anchors={[
+          { name: 'a', priority: 1 },
+          { name: 'b', floatyId: 'other' },
+        ]}
+      />,
+    );
     rerender(<App anchors={[{ name: 'a', priority: 1 }, { name: 'b' }]} />);
     expect(active()).toBe('a');
   });

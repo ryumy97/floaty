@@ -38,9 +38,7 @@ export function useRectTracker(
       schedule('scroll');
     };
     const resizeObserver =
-      typeof ResizeObserver !== 'undefined'
-        ? new ResizeObserver(() => schedule('layout'))
-        : null;
+      typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => schedule('layout')) : null;
     resizeObserver?.observe(el);
     // Scrolling also moves the anchor, so only unexplained moves count as layout.
     const stopObservingMoves = observeMove(el, () =>

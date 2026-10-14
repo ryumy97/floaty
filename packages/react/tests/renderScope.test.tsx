@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
-import { useState, type ReactNode } from 'react';
+import { type ReactNode, useState } from 'react';
 import { describe, expect, it } from 'vitest';
-import { Floaty, FloatyAnchor, configureFloaty, useFloaty, useFloatyState } from '../src';
+import { configureFloaty, Floaty, FloatyAnchor, useFloaty, useFloatyState } from '../src';
 import { floatyStore } from '../src/store';
 import { animations, flushFrames } from './setup';
 
@@ -73,7 +73,11 @@ describe('Floaty anchor switches', () => {
       return (
         <>
           <Floaty floatyId="r">content</Floaty>
-          <FloatyAnchor key={String(second)} floatyId="r" data-rect={second ? '100,0,10,10' : '0,0,10,10'} />
+          <FloatyAnchor
+            key={String(second)}
+            floatyId="r"
+            data-rect={second ? '100,0,10,10' : '0,0,10,10'}
+          />
         </>
       );
     }

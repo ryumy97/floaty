@@ -1,4 +1,4 @@
-import { settleTime, sizeSpringParams, springAt, springParams, type SpringParams } from './spring';
+import { type SpringParams, settleTime, sizeSpringParams, springAt, springParams } from './spring';
 import type {
   FloatyEasingTransition,
   FloatyRect,
@@ -212,7 +212,7 @@ export function easingFunction(easing: string): (t: number) => number {
   const named = NAMED_EASINGS[easing.trim()];
   const match = /^cubic-bezier\(([^)]+)\)$/.exec(easing.trim());
   const points = named ?? (match ? match[1].split(',').map(Number) : null);
-  if (!points || points.length !== 4 || points.some(Number.isNaN)) {
+  if (points?.length !== 4 || points.some(Number.isNaN)) {
     return cubicBezier(...NAMED_EASINGS['ease-in-out']);
   }
   return cubicBezier(points[0], points[1], points[2], points[3]);

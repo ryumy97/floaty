@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
-import { StrictMode, useEffect, useState, type ReactNode } from 'react';
+import { type ReactNode, StrictMode, useEffect, useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { Floaty, FloatyAnchor, configureFloaty, useFloaty, type FloatyProps } from '../src';
+import { configureFloaty, Floaty, FloatyAnchor, type FloatyProps, useFloaty } from '../src';
 import { createCurve, deltaStyle } from '../src/animate';
 import { floatyStore } from '../src/store';
 import { animations, endGracePeriod, reducedMotion } from './setup';
@@ -137,7 +137,11 @@ describe('Floaty', () => {
         width: 'calc(100% - 100px)',
         height: 'calc(100% - 70px)',
       },
-      { transform: 'translate3d(0px, 0px, 0)', width: 'calc(100% + 0px)', height: 'calc(100% + 0px)' },
+      {
+        transform: 'translate3d(0px, 0px, 0)',
+        width: 'calc(100% + 0px)',
+        height: 'calc(100% + 0px)',
+      },
     ]);
     expect(item().style.transform).toBe('translate3d(300px, 400px, 0)');
     expect(content().contains(screen.getByRole('button'))).toBe(true);
@@ -314,9 +318,7 @@ describe('retargeting', () => {
     expect(animations[0].cancel).toHaveBeenCalled();
     const before = createCurve(spring.transition, { x: -290, y: -380, width: -100, height: -70 });
     const gap = before.at(100).delta;
-    expect(animations[1].keyframes[0]).toEqual(
-      deltaStyle({ ...gap, y: gap.y + 50 }),
-    );
+    expect(animations[1].keyframes[0]).toEqual(deltaStyle({ ...gap, y: gap.y + 50 }));
     expect(item().dataset.floatyState).toBe('animating');
   });
 

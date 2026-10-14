@@ -4,17 +4,17 @@ import { createFloaty } from '@floaty/react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
+  type CSSProperties,
   createContext,
+  type ReactNode,
+  type PointerEvent as ReactPointerEvent,
   useContext,
   useEffect,
   useRef,
   useState,
-  type CSSProperties,
-  type PointerEvent as ReactPointerEvent,
-  type ReactNode,
 } from 'react';
 import { ExampleHeader } from '../ExampleHeader';
-import { LISTINGS, formatPrice, getListing, type Listing } from './listings';
+import { formatPrice, getListing, LISTINGS, type Listing } from './listings';
 
 interface MapAnchorState {
   form: 'split' | 'full' | 'preview';

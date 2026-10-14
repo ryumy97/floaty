@@ -1,6 +1,5 @@
 import { createStore } from 'zustand/vanilla';
 import { shallow } from 'zustand/vanilla/shallow';
-import { warnDev } from './utils';
 import type {
   FloatyChangeReason,
   FloatyEasingTransition,
@@ -10,6 +9,7 @@ import type {
   FloatyTransition,
   FloatyTransitionConfig,
 } from './types';
+import { warnDev } from './utils';
 
 export const DEFAULT_TRANSITION: FloatyEasingTransition = {
   duration: 300,
@@ -304,8 +304,7 @@ export function configureFloaty(
       ...state.config,
       ...options,
       transition:
-        resolveTransition(options.transition, state.config.transition) ||
-        state.config.transition,
+        resolveTransition(options.transition, state.config.transition) || state.config.transition,
     },
   }));
 }

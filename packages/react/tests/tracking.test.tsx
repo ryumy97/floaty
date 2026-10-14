@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
-import { useImperativeHandle, type Ref } from 'react';
+import { type Ref, useImperativeHandle } from 'react';
 import { describe, expect, it } from 'vitest';
 import { Floaty, FloatyAnchor, useFloaty } from '../src';
 import { floatyStore } from '../src/store';
@@ -20,7 +20,12 @@ function App({ anchors = ['a'] }: { anchors?: string[] }) {
       </Floaty>
       <div data-testid="scroller">
         {anchors.map((name) => (
-          <FloatyAnchor key={name} floatyId="t" data-testid={`anchor-${name}`} data-rect="0,0,10,10" />
+          <FloatyAnchor
+            key={name}
+            floatyId="t"
+            data-testid={`anchor-${name}`}
+            data-rect="0,0,10,10"
+          />
         ))}
       </div>
     </>

@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
 import {
   collectPageErrors,
   expectNotRemounted,
@@ -35,9 +35,7 @@ async function openVideo(page: Page, title: RegExp) {
   await expectSettled(page, 'video', WATCH_ANCHOR);
 }
 
-test('the player flies to the mini player dock and back without remounting', async ({
-  page,
-}) => {
+test('the player flies to the mini player dock and back without remounting', async ({ page }) => {
   await openVideo(page, /Chasing the aurora/);
   await tag(player(page));
   await expect.poll(() => elapsedSeconds(page)).toBeGreaterThan(0);

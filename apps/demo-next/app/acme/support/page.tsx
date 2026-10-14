@@ -3,7 +3,10 @@ import { ChatPageAnchor } from '../ChatShell';
 const FAQ = [
   ['How do I invite my team?', 'Open Settings, then Members, and paste their email addresses.'],
   ['Can I import from another tool?', 'Yes, from CSV or directly from most issue trackers.'],
-  ['Where is my invoice?', 'Billing, then History. Invoices are also emailed to the account owner.'],
+  [
+    'Where is my invoice?',
+    'Billing, then History. Invoices are also emailed to the account owner.',
+  ],
   ['Do you offer discounts?', 'Nonprofits and schools get 50% off the Team plan.'],
 ];
 

@@ -17,9 +17,9 @@ export default function Docs() {
           <h2 className="ex-subtitle">{title}</h2>
           <p>
             Acme connects to the tools your team already uses. Each project gets a roadmap that
-            fills itself from issues and pull requests, so the plan always reflects the work.
-            Scroll as far as you like: the support chat stays docked in the corner, with your
-            conversation where you left it.
+            fills itself from issues and pull requests, so the plan always reflects the work. Scroll
+            as far as you like: the support chat stays docked in the corner, with your conversation
+            where you left it.
           </p>
         </section>
       ))}

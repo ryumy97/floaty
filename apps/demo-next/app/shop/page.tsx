@@ -1,5 +1,5 @@
-import { ProductCard } from './ShopShell';
 import { PRODUCTS } from './products';
+import { ProductCard } from './ShopShell';
 
 export default function Shop() {
   return (

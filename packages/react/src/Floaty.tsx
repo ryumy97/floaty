@@ -1,14 +1,14 @@
-import { useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { type CSSProperties, type ReactNode, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useStore } from 'zustand';
 import {
   applyRect,
   createCurve,
+  type Motion,
   playCurve,
   prefersReducedMotion,
   shiftDelta,
   ZERO_RECT,
-  type Motion,
 } from './animate';
 import { useFloatyLayer } from './layer';
 import {
@@ -111,6 +111,10 @@ export function Floaty<S = unknown>({
       const outer = outerRef.current;
       const applied = appliedRef.current;
       if (outer && applied?.version === snapshot.version && applied.outer === outer) return;
+      // A new outer element (the layer was recreated while this Floaty stayed
+      // mounted, as in a StrictMode effect replay during hydration) has no
+      // transform yet, so the last target no longer describes it.
+      if (outer && applied && applied.outer !== outer) lastTargetRef.current = null;
       appliedRef.current = outer ? { version: snapshot.version, outer } : null;
       position(snapshot);
     };
@@ -174,7 +178,8 @@ export function Floaty<S = unknown>({
       prevTarget && sameAnchor && reason !== 'layout' ? prevTarget.fixed : inFixedContainer(anchor);
     const next: Placement = { rect: fixed ? rect : relativeTo(rect, layerRect), fixed };
     lastTargetRef.current = next;
-    if (!prevTarget || prevTarget.fixed !== fixed) outer.style.position = fixed ? 'fixed' : 'absolute';
+    if (!prevTarget || prevTarget.fixed !== fixed)
+      outer.style.position = fixed ? 'fixed' : 'absolute';
     if (!prevTarget || prevTarget.fixed !== fixed || !rectsEqual(prevTarget.rect, next.rect)) {
       applyRect(outer, next.rect);
     }
@@ -189,7 +194,8 @@ export function Floaty<S = unknown>({
       (!running || (config !== false && config.type === 'spring'));
 
     if (!prevTarget || !(anchorSwitched || layoutShifted)) {
-      if (!running) setState(outer, 'visible');
+      if (!prevTarget) stop();
+      if (!motionRef.current) setState(outer, 'visible');
       return;
     }
 

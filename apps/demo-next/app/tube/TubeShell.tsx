@@ -4,12 +4,12 @@ import { createFloaty } from '@floaty/react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
+  type CSSProperties,
   createContext,
+  type ReactNode,
   useContext,
   useEffect,
   useState,
-  type CSSProperties,
-  type ReactNode,
 } from 'react';
 import { formatTime, getVideo, type Video } from './videos';
 
@@ -157,6 +157,7 @@ function Player({ video }: { video: Video }) {
       style={{ '--hue': video.hue, '--flight': `${FLIGHT_MS}ms` } as CSSProperties}
       data-testid="player"
     >
+      {/* biome-ignore lint/a11y/useKeyWithClickEvents lint/a11y/noStaticElementInteractions: the play button is the keyboard control */}
       <div
         className={`tube-screen${isPlaying ? ' playing' : ''}`}
         onClick={mini ? undefined : togglePlay}
@@ -207,7 +208,9 @@ function Player({ video }: { video: Video }) {
 
 /** The watch page's slot for the player; wins over the dock while mounted. */
 export function PlayerAnchor() {
-  return <player.FloatyAnchor className="tube-player-anchor" priority={1} state={{ mode: 'full' }} />;
+  return (
+    <player.FloatyAnchor className="tube-player-anchor" priority={1} state={{ mode: 'full' }} />
+  );
 }
 
 export function WatchLayout({ details, upNext }: { details: ReactNode; upNext: ReactNode }) {

@@ -40,6 +40,7 @@ pnpm test         # unit tests
 pnpm test:e2e     # Playwright against both demos' production builds
                   # (first run: pnpm --filter @floaty/e2e exec playwright install chromium)
 pnpm typecheck
+pnpm lint         # Biome: lint, format and import order (pnpm lint:fix to apply fixes)
 pnpm build
 ```
 

@@ -4,15 +4,15 @@ import { Floaty, FloatyAnchor, useFloatyState } from '@floaty/react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
+  type CSSProperties,
   createContext,
+  type ReactNode,
   useContext,
   useEffect,
   useState,
-  type CSSProperties,
-  type ReactNode,
 } from 'react';
 import { ExampleHeader } from '../ExampleHeader';
-import { PHOTOS, photoFloatyId, type Photo, type PhotoAnchorState } from './photos';
+import { PHOTOS, type Photo, type PhotoAnchorState, photoFloatyId } from './photos';
 
 interface GalleryContextValue {
   /** Photo shown by the modal or the photo page, from the URL. */
@@ -41,7 +41,11 @@ export function GalleryShell({ children, modal }: { children: ReactNode; modal: 
   return (
     <GalleryContext.Provider value={{ openId, modalOpen, setModalOpen }}>
       <div className="ex">
-        <ExampleHeader logo="Lumen" home="/gallery" links={[{ href: '/gallery', label: 'Photos' }]} />
+        <ExampleHeader
+          logo="Lumen"
+          home="/gallery"
+          links={[{ href: '/gallery', label: 'Photos' }]}
+        />
         {children}
       </div>
 
@@ -49,6 +53,7 @@ export function GalleryShell({ children, modal }: { children: ReactNode; modal: 
        * The overlay layer sits above every page element, so this backdrop can't cover the
        * other floating photos: they dim themselves instead (see PhotoCard).
        */}
+      {/* biome-ignore lint/a11y/useKeyWithClickEvents lint/a11y/noStaticElementInteractions: Escape and the Close button close the modal from the keyboard */}
       <div
         className="gal-backdrop"
         data-open={modalOpen || undefined}
@@ -89,7 +94,11 @@ function PhotoCard({ photo }: { photo: Photo }) {
   return (
     <div className={`gal-card ${view}`} data-testid={`photo-${photo.id}`}>
       <Art photo={photo} />
-      {liked && <span className="gal-heart" aria-label="Liked">♥</span>}
+      {liked && (
+        <span className="gal-heart" role="img" aria-label="Liked">
+          ♥
+        </span>
+      )}
       {view === 'grid' && (
         <Link href={href} scroll={false} className="gal-hit" aria-label={`Open ${photo.title}`} />
       )}
@@ -113,17 +122,34 @@ function PhotoCard({ photo }: { photo: Photo }) {
       </div>
 
       <div className="gal-modal-controls ex-form" inert={view !== 'modal'}>
-        <Link href={`/gallery/photo/${prev.id}`} replace scroll={false} className="gal-button" aria-label="Previous photo">
+        <Link
+          href={`/gallery/photo/${prev.id}`}
+          replace
+          scroll={false}
+          className="gal-button"
+          aria-label="Previous photo"
+        >
           ←
         </Link>
-        <Link href={`/gallery/photo/${next.id}`} replace scroll={false} className="gal-button" aria-label="Next photo">
+        <Link
+          href={`/gallery/photo/${next.id}`}
+          replace
+          scroll={false}
+          className="gal-button"
+          aria-label="Next photo"
+        >
           →
         </Link>
         {/* A full load skips the interception and renders the photo page. */}
         <a href={href} className="gal-button">
           Open page
         </a>
-        <button type="button" className="gal-button" aria-label="Close" onClick={() => router.back()}>
+        <button
+          type="button"
+          className="gal-button"
+          aria-label="Close"
+          onClick={() => router.back()}
+        >
           ✕
         </button>
       </div>

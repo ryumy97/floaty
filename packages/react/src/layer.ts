@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { floatyStore, type FloatyConfig } from './store';
+import { type FloatyConfig, floatyStore } from './store';
 import { useIsomorphicLayoutEffect } from './utils';
 
 let layer: HTMLDivElement | null = null;

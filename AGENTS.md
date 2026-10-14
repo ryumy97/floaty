@@ -19,6 +19,7 @@ workspace dependencies first (`^build`) and caches results.
 | Unit tests | `pnpm test` |
 | E2E tests (builds and serves both demos) | `pnpm test:e2e` |
 | Typecheck everything | `pnpm typecheck` |
+| Lint, format and sort imports ([Biome](https://biomejs.dev), `biome.json`) | `pnpm lint` (`pnpm lint:fix` writes fixes) |
 | Build everything | `pnpm build` |
 | One package only | `pnpm --filter @floaty/react test` (or `turbo run test --filter=...`) |
 
@@ -27,9 +28,12 @@ Shared versions (`react`, `typescript`, `vite`, `next`, ...) live in the `catalo
 
 ## Before finishing a change
 
-Run `pnpm typecheck`, `pnpm test`, and `pnpm build`; all must pass. When changing
-positioning, animation or tracking in `packages/react/src/`, or the demos, also run
-`pnpm test:e2e` (first time: `pnpm --filter @floaty/e2e exec playwright install chromium`).
+Run `pnpm lint`, `pnpm typecheck`, `pnpm test`, and `pnpm build`; all must pass. Biome
+runs from the root over the whole repo (no Turborepo task); suppress a rule inline with a
+`// biome-ignore <rule>: <reason>` comment only when the code is right as written.
+
+When changing positioning, animation or tracking in `packages/react/src/`, or the demos,
+also run `pnpm test:e2e` (first time: `pnpm --filter @floaty/e2e exec playwright install chromium`).
 
 ## Project layout
 

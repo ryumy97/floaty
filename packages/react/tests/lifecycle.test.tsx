@@ -44,7 +44,9 @@ function App({
           content
         </Floaty>
       )}
-      {layout !== 'none' && <FloatyAnchor key={layout} floatyId="l" data-rect={rectAttr(RECTS[layout])} />}
+      {layout !== 'none' && (
+        <FloatyAnchor key={layout} floatyId="l" data-rect={rectAttr(RECTS[layout])} />
+      )}
     </>
   );
 }
@@ -92,9 +94,7 @@ describe('anchor switch mid-flight', () => {
     expect(options.duration).toBeCloseTo(expected.duration);
     const step = expected.duration / (keyframes.length - 1);
     expect(keyframes[1]).toEqual(deltaStyle(expected.at(step).delta));
-    expect(keyframes[1]).not.toEqual(
-      deltaStyle(createCurve(spring, startGap).at(step).delta),
-    );
+    expect(keyframes[1]).not.toEqual(deltaStyle(createCurve(spring, startGap).at(step).delta));
   });
 });
 

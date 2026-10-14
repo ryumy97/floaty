@@ -35,7 +35,7 @@
   border-radius: 999px;
 }
 
-.tube-nav a[aria-current='page'] {
+.tube-nav a[aria-current="page"] {
   background: #1d1d27;
   color: white;
 }
@@ -160,8 +160,8 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) 400px;
   grid-template-areas:
-    'player upnext'
-    'details upnext';
+    "player upnext"
+    "details upnext";
   align-items: start;
   gap: 24px;
   padding: 24px;
@@ -171,8 +171,8 @@
 
 .tube-watch.theater {
   grid-template-areas:
-    'player player'
-    'details upnext';
+    "player player"
+    "details upnext";
   padding-top: 0;
 }
 
@@ -254,7 +254,7 @@
   .tube-watch,
   .tube-watch.theater {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-areas: 'player' 'details' 'upnext';
+    grid-template-areas: "player" "details" "upnext";
   }
 }
 

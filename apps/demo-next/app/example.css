@@ -36,7 +36,7 @@
   border-radius: 999px;
 }
 
-.ex-nav a[aria-current='page'] {
+.ex-nav a[aria-current="page"] {
   background: #1d1d27;
   color: white;
 }

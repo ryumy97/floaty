@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
 import {
   expectAligned,
   expectSettled,
@@ -215,8 +215,7 @@ test.describe('scrolling', () => {
 });
 
 test.describe('content form during transitions', () => {
-  const player = (page: Page) =>
-    page.locator('[data-floaty="player"] .card.player');
+  const player = (page: Page) => page.locator('[data-floaty="player"] .card.player');
 
   test('switches form at take-off by default', async ({ page }) => {
     await setDuration(page, 1500);

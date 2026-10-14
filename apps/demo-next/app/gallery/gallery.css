@@ -155,6 +155,6 @@
   cursor: pointer;
 }
 
-.gal-button[aria-pressed='true'] {
+.gal-button[aria-pressed="true"] {
   background: #fb7185;
 }

@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { Suspense } from 'react';
 import { TheaterToggle, Thumbnail, WatchLayout } from '../../TubeShell';
-import { VIDEOS, getVideo, type Video } from '../../videos';
+import { getVideo, VIDEOS, type Video } from '../../videos';
 
 export default async function Watch({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -58,8 +58,10 @@ async function Comments({ video }: { video: Video }) {
     <section className="tube-comments" aria-label="Comments">
       <h2 className="tube-subtitle">{count} comments</h2>
       {Array.from({ length: count }, (_, i) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: generated comments are identified by their position
         <p key={i}>
-          <strong>@{AUTHORS[(video.hue + i) % AUTHORS.length]}</strong> {COMMENTS[i % COMMENTS.length]}
+          <strong>@{AUTHORS[(video.hue + i) % AUTHORS.length]}</strong>{' '}
+          {COMMENTS[i % COMMENTS.length]}
         </p>
       ))}
     </section>

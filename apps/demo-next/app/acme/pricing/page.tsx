@@ -2,8 +2,16 @@ import { TalkToSales } from '../ChatShell';
 
 const PLANS = [
   { name: 'Free', price: '$0', points: ['Up to 3 projects', 'Community support'] },
-  { name: 'Team', price: '$12', points: ['Unlimited projects', 'Roadmaps and insights', 'Chat support'] },
-  { name: 'Enterprise', price: 'Custom', points: ['SSO and audit logs', 'Dedicated manager', '99.99% SLA'] },
+  {
+    name: 'Team',
+    price: '$12',
+    points: ['Unlimited projects', 'Roadmaps and insights', 'Chat support'],
+  },
+  {
+    name: 'Enterprise',
+    price: 'Custom',
+    points: ['SSO and audit logs', 'Dedicated manager', '99.99% SLA'],
+  },
 ];
 
 export default function Pricing() {

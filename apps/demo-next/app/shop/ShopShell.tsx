@@ -4,22 +4,15 @@ import { createFloaty } from '@floaty/react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
-  createContext,
-  useContext,
-  useState,
   type CSSProperties,
+  createContext,
   type FormEvent,
   type ReactNode,
+  useContext,
+  useState,
 } from 'react';
 import { ExampleHeader } from '../ExampleHeader';
-import {
-  COUPONS,
-  FREE_SHIPPING_FROM,
-  SHIPPING,
-  getProduct,
-  money,
-  type Product,
-} from './products';
+import { COUPONS, FREE_SHIPPING_FROM, getProduct, money, type Product, SHIPPING } from './products';
 
 interface SummaryAnchorState {
   form: 'pill' | 'cart' | 'checkout' | 'receipt';
@@ -284,11 +277,19 @@ export function CartItems() {
             <span className="ex-meta">{money(product.price)}</span>
           </div>
           <div className="shop-qty">
-            <button type="button" aria-label={`Fewer ${product.name}`} onClick={() => setQty(product.id, qty - 1)}>
+            <button
+              type="button"
+              aria-label={`Fewer ${product.name}`}
+              onClick={() => setQty(product.id, qty - 1)}
+            >
               −
             </button>
             <span>{qty}</span>
-            <button type="button" aria-label={`More ${product.name}`} onClick={() => setQty(product.id, qty + 1)}>
+            <button
+              type="button"
+              aria-label={`More ${product.name}`}
+              onClick={() => setQty(product.id, qty + 1)}
+            >
               +
             </button>
           </div>

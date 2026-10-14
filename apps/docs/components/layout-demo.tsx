@@ -1,64 +1,121 @@
 'use client';
 
-import { Floaty, FloatyAnchor, useFloatyState } from '@floaty/react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { BlobAnchor } from './blob';
 
-type Layout = 'card' | 'row';
+const MAX_COLS = 12;
+const MAX_ROWS = 6;
 
-function Counter() {
-  const state = useFloatyState<{ compact: boolean }>();
-  const [count, setCount] = useState(0);
+type Position = { x: number; y: number };
+
+function Stepper({
+  label,
+  value,
+  max,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  max: number;
+  onChange: (value: number) => void;
+}) {
+  const button =
+    'size-7 rounded-lg border bg-fd-card text-sm transition-colors hover:bg-fd-accent disabled:pointer-events-none disabled:opacity-40';
   return (
-    <button
-      type="button"
-      onClick={() => setCount((c) => c + 1)}
-      className="flex size-full items-center justify-center rounded-xl bg-fd-primary font-medium text-fd-primary-foreground"
-    >
-      {state?.compact ? count : `Clicked ${count} times`}
-    </button>
+    <div className="flex items-center gap-2 text-sm">
+      <span className="text-fd-muted-foreground">{label}</span>
+      <button
+        type="button"
+        aria-label={`Fewer ${label.toLowerCase()}`}
+        disabled={value <= 1}
+        onClick={() => onChange(value - 1)}
+        className={button}
+      >
+        −
+      </button>
+      <span className="w-5 text-center tabular-nums">{value}</span>
+      <button
+        type="button"
+        aria-label={`More ${label.toLowerCase()}`}
+        disabled={value >= max}
+        onClick={() => onChange(value + 1)}
+        className={button}
+      >
+        +
+      </button>
+    </div>
   );
 }
 
 /** Live example: one stateful button following two different layouts. */
 export function LayoutDemo() {
-  const [layout, setLayout] = useState<Layout>('card');
+  const [cols, setCols] = useState(2);
+  const [rows, setRows] = useState(2);
+  const [position, setPosition] = useState<Position | null>(null);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: each new position restarts the timer
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      setPosition(null);
+    }, 5000);
+    return () => clearTimeout(timeout);
+  }, [position]);
+
+  const resize = (nextCols: number, nextRows: number) => {
+    setCols(nextCols);
+    setRows(nextRows);
+    setPosition((p) => (p && (p.x >= nextCols || p.y >= nextRows) ? null : p));
+  };
+
   return (
-    <div className="not-prose my-6 rounded-xl border bg-fd-card p-4">
-      <div className="mb-4 flex gap-2">
-        {(['card', 'row'] as const).map((name) => (
-          <button
-            key={name}
-            type="button"
-            aria-pressed={layout === name}
-            onClick={() => setLayout(name)}
-            className="rounded-md border px-3 py-1 text-sm aria-pressed:bg-fd-accent aria-pressed:text-fd-accent-foreground"
-          >
-            {name}
-          </button>
-        ))}
+    <>
+      <div className="relative w-full flex items-center justify-center h-4">
+        {!position && <BlobAnchor state={{ children: <div className="" /> }} className="size-4" />}
       </div>
-
-      <Floaty floatyId="docs-demo" transition={{ type: 'spring', duration: 450, bounce: 0.2 }}>
-        <Counter />
-      </Floaty>
-
-      {layout === 'card' ? (
-        <div className="grid grid-cols-2 items-center gap-4">
-          <FloatyAnchor floatyId="docs-demo" state={{ compact: false }} className="h-40" />
-          <p className="text-sm text-fd-muted-foreground">
-            Click the button, then switch layouts. It is rendered once, in a layer on top of
-            the page, so its count survives the switch.
-          </p>
+      <div className="not-prose my-6 rounded-xl border bg-fd-card p-4">
+        <div className="mb-4 flex flex-wrap gap-6">
+          <Stepper
+            label="Columns"
+            value={cols}
+            max={MAX_COLS}
+            onChange={(value) => resize(value, rows)}
+          />
+          <Stepper
+            label="Rows"
+            value={rows}
+            max={MAX_ROWS}
+            onChange={(value) => resize(cols, value)}
+          />
         </div>
-      ) : (
-        <div className="flex items-center gap-4">
-          <p className="flex-1 text-sm text-fd-muted-foreground">
-            Same component instance, now compact: the anchor passes{' '}
-            <code>{'{ compact: true }'}</code> as state.
-          </p>
-          <FloatyAnchor floatyId="docs-demo" state={{ compact: true }} className="size-12" />
+        <div
+          className="grid gap-4"
+          style={{
+            gridTemplateColumns: `repeat(${cols}, 1fr)`,
+            gridTemplateRows: `repeat(${rows}, 1fr)`,
+          }}
+        >
+          {Array.from({ length: cols * rows }, (_, index) => {
+            const x = index % cols;
+            const y = Math.floor(index / cols);
+            return (
+              <button
+                type="button"
+                key={`${x}-${y}`}
+                onClick={() => setPosition({ x, y })}
+                className="relative h-40 rounded-2xl border-[1.5px] border-dashed border-anchor bg-anchor-fill font-mono text-sm text-fd-muted-foreground tabular-nums transition-colors hover:border-float/60 cursor-pointer"
+              >
+                {index}
+                {position?.x === x && position.y === y && (
+                  <BlobAnchor
+                    state={{ children: <>{index}</> }}
+                    className="absolute inset-0 size-full"
+                  />
+                )}
+              </button>
+            );
+          })}
         </div>
-      )}
-    </div>
+      </div>
+    </>
   );
 }

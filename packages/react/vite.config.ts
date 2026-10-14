@@ -1,13 +1,10 @@
 import { fileURLToPath } from 'node:url';
-import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import { defineConfig } from 'vite';
 import dts from 'vite-plugin-dts';
 
 export default defineConfig({
-  plugins: [
-    react(),
-    dts({ tsconfigPath: './tsconfig.build.json' }),
-  ],
+  plugins: [react(), dts({ tsconfigPath: './tsconfig.build.json' })],
   build: {
     lib: {
       entry: fileURLToPath(new URL('./src/index.ts', import.meta.url)),

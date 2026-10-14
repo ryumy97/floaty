@@ -1,11 +1,11 @@
 import {
+  configureFloaty,
   Floaty,
   FloatyAnchor,
-  configureFloaty,
+  type FloatyTransition,
   useFloaty,
   useFloatyState,
   useFloatyTransition,
-  type FloatyTransition,
 } from '@floaty/react';
 import { useEffect, useState } from 'react';
 
@@ -95,6 +95,7 @@ function Placeholders({ label, count, from = 1 }: { label: string; count: number
   return (
     <>
       {Array.from({ length: count }, (_, i) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: placeholders are identified by their position
         <Placeholder key={i} label={`${label} ${from + i}`} />
       ))}
     </>
@@ -220,18 +221,17 @@ export function App() {
         <h1>Floaty playground</h1>
         <nav>
           {LAYOUTS.map((l) => (
-            <button
-              key={l}
-              type="button"
-              aria-pressed={layout === l}
-              onClick={() => setLayout(l)}
-            >
+            <button key={l} type="button" aria-pressed={layout === l} onClick={() => setLayout(l)}>
               {l}
             </button>
           ))}
         </nav>
         <label>
-          <input type="checkbox" checked={animated} onChange={(e) => setAnimated(e.target.checked)} />
+          <input
+            type="checkbox"
+            checked={animated}
+            onChange={(e) => setAnimated(e.target.checked)}
+          />
           animate
         </label>
         <label>

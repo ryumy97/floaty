@@ -97,7 +97,9 @@ describe('createFloaty', () => {
           <Title />
         </other.Floaty>,
       ),
-    ).toThrow('useFloatyState() for "player" was called inside the content of <Floaty floatyId="other">.');
+    ).toThrow(
+      'useFloatyState() for "player" was called inside the content of <Floaty floatyId="other">.',
+    );
     error.mockRestore();
   });
 

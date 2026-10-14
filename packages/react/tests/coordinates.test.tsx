@@ -15,7 +15,9 @@ function App({ where, transition = false }: { where: 'page' | 'fixed'; transitio
       <Floaty floatyId="c" transition={transition ? { duration: 300, easing: 'linear' } : false}>
         content
       </Floaty>
-      {where === 'page' && <FloatyAnchor floatyId="c" data-testid="anchor" data-rect="0,100,100,50" />}
+      {where === 'page' && (
+        <FloatyAnchor floatyId="c" data-testid="anchor" data-rect="0,100,100,50" />
+      )}
       {where === 'fixed' && (
         <div style={{ position: 'fixed' }}>
           <FloatyAnchor floatyId="c" data-testid="anchor" data-rect="0,0,100,50" />

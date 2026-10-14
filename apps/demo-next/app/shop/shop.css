@@ -86,15 +86,15 @@
 }
 
 .shop-steps li::before {
-  content: counter(step) '. ';
+  content: counter(step) ". ";
 }
 
-.shop-steps li[data-state='current'] {
+.shop-steps li[data-state="current"] {
   background: #b45309;
   color: white;
 }
 
-.shop-steps li[data-state='done'] {
+.shop-steps li[data-state="done"] {
   color: #1d1d27;
 }
 
@@ -306,7 +306,7 @@
   cursor: pointer;
 }
 
-.shop-cta[aria-disabled='true'] {
+.shop-cta[aria-disabled="true"] {
   opacity: 0.4;
   cursor: default;
 }

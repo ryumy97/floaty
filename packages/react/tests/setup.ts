@@ -170,21 +170,20 @@ beforeEach(() => {
     removeEventListener() {},
     dispatchEvent: () => false,
   })) as typeof window.matchMedia;
-  HTMLElement.prototype.animate = vi.fn(function (
-    keyframes: Keyframe[],
-    options: KeyframeAnimationOptions,
-  ) {
-    const animation: FakeAnimation = {
-      keyframes,
-      options,
-      onfinish: null,
-      cancel: vi.fn(),
-      currentTime: 0,
-      finish: () => animation.onfinish?.(),
-    };
-    animations.push(animation);
-    return animation as unknown as Animation;
-  }) as unknown as HTMLElement['animate'];
+  HTMLElement.prototype.animate = vi.fn(
+    (keyframes: Keyframe[], options: KeyframeAnimationOptions) => {
+      const animation: FakeAnimation = {
+        keyframes,
+        options,
+        onfinish: null,
+        cancel: vi.fn(),
+        currentTime: 0,
+        finish: () => animation.onfinish?.(),
+      };
+      animations.push(animation);
+      return animation as unknown as Animation;
+    },
+  ) as unknown as HTMLElement['animate'];
 });
 
 afterEach(() => {

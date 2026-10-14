@@ -14,7 +14,11 @@ describe('springParams', () => {
   it('maps physical options to the same parameters', () => {
     const omega = 10;
     const zeta = 0.4;
-    const params = springParams({ stiffness: omega * omega * 2, damping: 2 * zeta * omega * 2, mass: 2 });
+    const params = springParams({
+      stiffness: omega * omega * 2,
+      damping: 2 * zeta * omega * 2,
+      mass: 2,
+    });
     expect(params.omega).toBeCloseTo(omega);
     expect(params.zeta).toBeCloseTo(zeta);
   });
@@ -44,13 +48,16 @@ describe('springAt', () => {
     expect(Math.abs(end.velocity)).toBeLessThan(5);
   });
 
-  it.each(Object.entries(cases))('%s: continuing from a sampled state matches the original', (_, params) => {
-    const mid = springAt(params, from, 0.12);
-    const direct = springAt(params, from, 0.3);
-    const resumed = springAt(params, mid, 0.18);
-    expect(resumed.value).toBeCloseTo(direct.value, 6);
-    expect(resumed.velocity).toBeCloseTo(direct.velocity, 6);
-  });
+  it.each(Object.entries(cases))(
+    '%s: continuing from a sampled state matches the original',
+    (_, params) => {
+      const mid = springAt(params, from, 0.12);
+      const direct = springAt(params, from, 0.3);
+      const resumed = springAt(params, mid, 0.18);
+      expect(resumed.value).toBeCloseTo(direct.value, 6);
+      expect(resumed.velocity).toBeCloseTo(direct.velocity, 6);
+    },
+  );
 
   it('overshoots only when underdamped', () => {
     const minOver = (params: { omega: number; zeta: number }) => {

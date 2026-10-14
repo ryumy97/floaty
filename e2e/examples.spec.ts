@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
 import { collectPageErrors, expectNotRemounted, expectSettled, tag } from './helpers';
 
 /** The Next.js demo's multi-page examples, listed on its home page; one describe per example. */
@@ -117,9 +117,7 @@ test.describe('support chat', () => {
     await expect(input).toHaveValue('half-typed draft');
   });
 
-  test('animates between the bubble and the panel, counting unread replies', async ({
-    page,
-  }) => {
+  test('animates between the bubble and the panel, counting unread replies', async ({ page }) => {
     await page.goto('/acme/pricing');
     await page.getByRole('button', { name: 'Talk to sales' }).click();
     await expectSettled(page, 'support-chat', '.chat-dock-anchor');

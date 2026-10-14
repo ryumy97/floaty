@@ -1,6 +1,6 @@
 import { act, render, renderHook, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { Floaty, FloatyAnchor, useFloatyTransition, type FloatyProps } from '../src';
+import { Floaty, FloatyAnchor, type FloatyProps, useFloatyTransition } from '../src';
 import { animations, endGracePeriod, reducedMotion } from './setup';
 
 type Mode = { mode: string };
@@ -124,7 +124,12 @@ describe('settledState', () => {
             }}
           </Floaty>
           {layout !== 'none' && (
-            <FloatyAnchor key={layout} floatyId="r" data-rect={RECTS[layout]} state={{ mode: layout }} />
+            <FloatyAnchor
+              key={layout}
+              floatyId="r"
+              data-rect={RECTS[layout]}
+              state={{ mode: layout }}
+            />
           )}
         </>
       );

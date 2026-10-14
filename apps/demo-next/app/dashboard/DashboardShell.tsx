@@ -2,9 +2,9 @@
 
 import { Floaty, FloatyAnchor, useFloatyState } from '@floaty/react';
 import Link from 'next/link';
-import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
+import { type CSSProperties, type ReactNode, useEffect, useState } from 'react';
 import { ExampleHeader } from '../ExampleHeader';
-import { WIDGETS, widgetFloatyId, type WidgetAnchorState, type WidgetDef } from './widgets';
+import { WIDGETS, type WidgetAnchorState, type WidgetDef, widgetFloatyId } from './widgets';
 
 export function DashboardShell({ children }: { children: ReactNode }) {
   return (
@@ -95,12 +95,7 @@ function Widget({ def }: { def: WidgetDef }) {
           </div>
           <div className="dash-ranges ex-form" inert={form !== 'large'}>
             {([60, 300] as const).map((r) => (
-              <button
-                key={r}
-                type="button"
-                aria-pressed={range === r}
-                onClick={() => setRange(r)}
-              >
+              <button key={r} type="button" aria-pressed={range === r} onClick={() => setRange(r)}>
                 {r === 60 ? '1 min' : '5 min'}
               </button>
             ))}
@@ -111,10 +106,17 @@ function Widget({ def }: { def: WidgetDef }) {
           hover={form === 'large' ? hover : null}
           onHover={form === 'large' ? setHover : undefined}
         />
-        {form === 'card' && <Link href={href} className="dash-hit" aria-label={`Open ${def.label}`} />}
+        {form === 'card' && (
+          <Link href={href} className="dash-hit" aria-label={`Open ${def.label}`} />
+        )}
       </div>
 
-      <Link href={href} className="dash-rail ex-form" inert={form !== 'rail'} aria-label={def.label}>
+      <Link
+        href={href}
+        className="dash-rail ex-form"
+        inert={form !== 'rail'}
+        aria-label={def.label}
+      >
         <span>
           <span className="dash-label">{def.label}</span>
           <strong>{def.format(current)}</strong>
@@ -143,6 +145,7 @@ function Chart({
     .join(' ');
   return (
     <svg
+      aria-hidden
       className="dash-chart"
       viewBox="0 0 100 40"
       preserveAspectRatio="none"

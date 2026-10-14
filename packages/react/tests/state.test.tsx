@@ -19,7 +19,11 @@ function Counter() {
     effectRuns(state?.variant);
   }, [state?.variant]);
   return (
-    <button type="button" data-variant={state?.variant ?? 'none'} onClick={() => setCount((c) => c + step)}>
+    <button
+      type="button"
+      data-variant={state?.variant ?? 'none'}
+      onClick={() => setCount((c) => c + step)}
+    >
       {state?.variant === 'compact' ? `${count}` : `count: ${count}`}
     </button>
   );

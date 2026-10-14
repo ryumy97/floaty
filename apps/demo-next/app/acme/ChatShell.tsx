@@ -4,13 +4,13 @@ import { createFloaty } from '@floaty/react';
 import Link from 'next/link';
 import {
   createContext,
+  type FormEvent,
+  type ReactNode,
   useContext,
   useEffect,
   useLayoutEffect,
   useRef,
   useState,
-  type FormEvent,
-  type ReactNode,
 } from 'react';
 import { ExampleHeader } from '../ExampleHeader';
 
@@ -20,9 +20,7 @@ interface ChatAnchorState {
 
 export const chat = createFloaty<ChatAnchorState>('support-chat');
 
-const ChatContext = createContext<{ open: boolean; setOpen: (open: boolean) => void } | null>(
-  null,
-);
+const ChatContext = createContext<{ open: boolean; setOpen: (open: boolean) => void } | null>(null);
 
 export function useChat() {
   const value = useContext(ChatContext);
@@ -87,9 +85,15 @@ interface Message {
 }
 
 const REPLIES: [RegExp, string][] = [
-  [/price|pricing|cost|plan/i, 'Our Team plan is $12 per seat per month, billed yearly. Want me to set up a trial?'],
+  [
+    /price|pricing|cost|plan/i,
+    'Our Team plan is $12 per seat per month, billed yearly. Want me to set up a trial?',
+  ],
   [/trial|demo/i, 'Done! A 14-day trial is on its way to your inbox.'],
-  [/bug|error|broken|issue/i, 'Sorry about that. Could you tell me which page you were on? I will pass it to the team.'],
+  [
+    /bug|error|broken|issue/i,
+    'Sorry about that. Could you tell me which page you were on? I will pass it to the team.',
+  ],
   [/hi|hello|hey/i, 'Hi! What can I help you with today?'],
 ];
 
@@ -104,7 +108,11 @@ function Chat() {
   const form = chat.useFloatyState()?.form ?? 'bubble';
   const { setOpen } = useChat();
   const [messages, setMessages] = useState<Message[]>([
-    { id: 0, from: 'agent', text: 'Hi, I am Sam from Acme. Ask me anything, I will stay with you on every page.' },
+    {
+      id: 0,
+      from: 'agent',
+      text: 'Hi, I am Sam from Acme. Ask me anything, I will stay with you on every page.',
+    },
   ]);
   const [draft, setDraft] = useState('');
   const [typing, setTyping] = useState(false);
@@ -120,6 +128,7 @@ function Chat() {
     if (!isBubble) setUnread(0);
   }, [isBubble]);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: scrolls down whenever a message or the typing indicator is added
   useLayoutEffect(() => {
     const el = list.current;
     if (el && stickToBottom.current) el.scrollTop = el.scrollHeight;
@@ -149,8 +158,7 @@ function Chat() {
         aria-label="Open chat"
         onClick={() => setOpen(true)}
       >
-        💬
-        {unread > 0 && isBubble && <span className="chat-unread">{unread}</span>}
+        💬{unread > 0 && isBubble && <span className="chat-unread">{unread}</span>}
       </button>
 
       <div className="chat-window ex-form" inert={isBubble}>

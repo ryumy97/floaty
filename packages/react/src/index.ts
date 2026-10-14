@@ -1,23 +1,23 @@
-export { Floaty } from './Floaty';
-export type { FloatyProps, FloatyRenderStatus } from './Floaty';
-export { useFloatyState, useFloatyTransition } from './useFloatyState';
-export type { FloatyTransitionStatus } from './useFloatyState';
-export { FloatyAnchor } from './FloatyAnchor';
-export type { FloatyAnchorProps } from './FloatyAnchor';
-export { createFloaty } from './createFloaty';
 export type { FloatyChannel } from './createFloaty';
-export { useFloaty } from './useFloaty';
-export type { FloatyStatus } from './useFloaty';
-export { configureFloaty, resetFloaty, DEFAULT_TRANSITION } from './store';
+export { createFloaty } from './createFloaty';
+export type { FloatyProps, FloatyRenderStatus } from './Floaty';
+export { Floaty } from './Floaty';
+export type { FloatyAnchorProps } from './FloatyAnchor';
+export { FloatyAnchor } from './FloatyAnchor';
 export type { FloatyConfig } from './store';
+export { configureFloaty, DEFAULT_TRANSITION, resetFloaty } from './store';
 export type {
-  FloatyRect,
-  FloatyTransition,
-  FloatyTransitionConfig,
+  FloatyChangeReason,
   FloatyEasingTransition,
-  FloatySpringTransition,
+  FloatyRect,
   FloatySpringOptions,
   FloatySpringPhysics,
+  FloatySpringTransition,
   FloatySpringVisual,
-  FloatyChangeReason,
+  FloatyTransition,
+  FloatyTransitionConfig,
 } from './types';
+export type { FloatyStatus } from './useFloaty';
+export { useFloaty } from './useFloaty';
+export type { FloatyTransitionStatus } from './useFloatyState';
+export { useFloatyState, useFloatyTransition } from './useFloatyState';

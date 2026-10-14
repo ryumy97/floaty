@@ -1,6 +1,6 @@
 import { render } from '@testing-library/react';
 import { StrictMode } from 'react';
-import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, type MockInstance, vi } from 'vitest';
 import { Floaty, FloatyAnchor } from '../src';
 import { floatyStore } from '../src/store';
 
@@ -8,7 +8,15 @@ const contents = () =>
   [...document.querySelectorAll('[data-floaty="d"]')].map((el) => el.textContent);
 const isAnimating = () => floatyStore.getState().snapshots.d?.isAnimating ?? false;
 
-function App({ first = true, second = true, x = 0 }: { first?: boolean; second?: boolean; x?: number }) {
+function App({
+  first = true,
+  second = true,
+  x = 0,
+}: {
+  first?: boolean;
+  second?: boolean;
+  x?: number;
+}) {
   return (
     <>
       {first && <Floaty floatyId="d">first</Floaty>}

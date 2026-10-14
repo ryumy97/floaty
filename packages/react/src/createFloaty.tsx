@@ -1,8 +1,8 @@
 import { forwardRef, type ReactElement, type Ref } from 'react';
 import { Floaty, type FloatyProps } from './Floaty';
 import { FloatyAnchor, type FloatyAnchorProps } from './FloatyAnchor';
-import { useFloaty, type FloatyStatus } from './useFloaty';
-import { useContentContext, type FloatyTransitionStatus } from './useFloatyState';
+import { type FloatyStatus, useFloaty } from './useFloaty';
+import { type FloatyTransitionStatus, useContentContext } from './useFloatyState';
 
 /** Components and hooks bound to one `floatyId` and one anchor state type. */
 export interface FloatyChannel<S> {
