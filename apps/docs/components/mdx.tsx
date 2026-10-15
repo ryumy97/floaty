@@ -5,6 +5,7 @@ import { Preview } from './examples/preview';
 import QuickStart from './examples/quick-start';
 import SwitchOnLanding from './examples/switch-on-landing';
 import { LayoutDemo } from './layout-demo';
+import { TransitionPlayground } from './transition-playground';
 
 export function getMDXComponents(components?: MDXComponents) {
   return {
@@ -14,6 +15,7 @@ export function getMDXComponents(components?: MDXComponents) {
     Preview,
     QuickStart,
     SwitchOnLanding,
+    TransitionPlayground,
     ...components,
   } satisfies MDXComponents;
 }

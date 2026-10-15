@@ -3,14 +3,30 @@ title: Transitions
 description: Easing curves, springs, and snapping.
 ---
 
-`transition` is set globally with `configureFloaty` or per `<Floaty>`, and is one of:
+`transition` is set globally with `configureFloaty` or per `<Floaty>`.
+
+```tsx
+configureFloaty({ transition: { type: 'spring', duration: 400, bounce: 0.2 } });
+<Floaty floatyId="counter" transition={{ type: 'spring', duration: 400, bounce: 0.2 }}>
+  <Counter />
+</Floaty>
+```
+
+These can be one of the following:
 
 ```ts
-false                                                     // snap (per Floaty only)
+false                                                     // snap
 { duration?: 300, easing?: 'ease-in-out' }                // easing: any CSS easing
 { type: 'spring', duration: 400, bounce?: 0 }             // spring, visual attributes
 { type: 'spring', stiffness: 300, damping: 25, mass?: 1 } // spring, physical attributes
 ```
+
+## Try it
+
+Tune a spring or an easing curve and press **Play**. The graph plots progress (0 to 1) over
+time; the dashed line is `linear` with the same duration, and the lanes below race the two.
+
+<TransitionPlayground />
 
 ## Easing
 
@@ -37,7 +53,4 @@ continues from the current position and velocity.
 
 - Switching anchors animates. So does the active anchor moving or resizing, unless
   `animateLayoutChanges={false}`.
-- Scrolling never animates and never restarts a running transition.
 - `prefers-reduced-motion: reduce` turns every transition into a snap.
-- `onTransitionStart` and `onTransitionEnd` fire once per transition, even when it is
-  retargeted mid-flight.
