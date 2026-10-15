@@ -5,8 +5,9 @@ description: Which anchor is active, and what happens between anchors.
 
 ## Choosing the active anchor
 
-Any number of anchors can share a `floatyId`; only one is active. It is the one with the
-highest `priority` (default `0`), and among equal priorities the most recently mounted one.
+Any number of anchors can share a `floatyId`; 
+but only one is active since we only render one Floaty component per id. 
+It is the one with the highest `priority` (default `0`), and among equal priorities the most recently mounted one.
 When it unmounts, the next one by the same rule becomes active, and changing `priority`
 switches (and animates) to the new winner.
 
@@ -24,22 +25,40 @@ Set `priority` whenever two anchors can be mounted at once and the winner matter
 <FloatyAnchor floatyId="player" />              {/* list item */}
 ```
 
-## Anchors that arrive late
+## When active anchor is removed
 
-When the last anchor unmounts, the content stays where it was for `anchorGracePeriod` ms
-(default 150) before hiding. An anchor that mounts within that window, after a lazy route,
-a `Suspense` fallback or data loading, still animates from the old position instead of
-snapping. `useFloaty().hasAnchor` stays `true` during the window. Tune it with
-`configureFloaty({ anchorGracePeriod })`.
+What happens when the active anchor unmounts depends on whether another anchor takes its
+place:
 
-## Keeping up with layout
+- **Other anchors are mounted:** the next one by the rules above becomes active right away,
+  and the content animates to it.
+- **It was the last anchor:** it stays active for a short grace period (`anchorGracePeriod`,
+  default `150` ms), and the content stays where it is. If a new anchor mounts within that
+  window, the content animates to it as if the two had swapped in one render. This covers
+  anchors that mount a moment later: lazy routes, `Suspense` fallbacks, loading states and
+  anchors rendered from an effect.
+- **No anchor arrives in time:** the content hides. An anchor that mounts later makes it
+  appear there without animating, since the old position is stale by then.
 
-Anchors are re-measured on resize (`ResizeObserver`), on moves without resize such as an
-image loading above them (`IntersectionObserver`), on window resize, on any scroll, and
-whenever the anchor re-renders. `useFloaty(id).remeasure()` forces a re-measure for the
-rare cases these miss.
+While hidden, the content stays mounted by default, keeping its React state, last size and
+last [anchor state](/docs/guides/anchor-state). Use `keepMounted={false}` to unmount it
+instead (see [Self-measuring content](/docs/guides/self-measuring-content)).
+`useFloaty(id).hasAnchor` tells you whether an anchor is active; it stays `true` during the
+grace period.
 
-## One Floaty per id
+If your loads regularly take longer than the grace period, raise it:
 
-Render one `<Floaty>` per `floatyId`. If several are mounted, only the first renders (a
-warning is logged in development); when it unmounts, the next one takes over.
+```tsx
+configureFloaty({ anchorGracePeriod: 300 }); // 0 hides as soon as the last anchor unmounts
+```
+
+To make the content always fly somewhere instead of hiding, keep a low-priority anchor
+mounted in a persistent layout, such as a mini-player in the app shell:
+
+```tsx
+// app shell: always mounted, used when nothing else is
+<FloatyAnchor floatyId="player" priority={-1} />
+
+// pages: take over while mounted, fly back to the shell when they unmount
+<FloatyAnchor floatyId="player" />
+```
