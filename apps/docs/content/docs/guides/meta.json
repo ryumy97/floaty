@@ -5,7 +5,7 @@
     "transitions",
     "multiple-anchors",
     "typed-channels",
-    "self-measuring-content",
+    "keeping-content-mounted",
     "nextjs",
     "portal-side-effects"
   ]

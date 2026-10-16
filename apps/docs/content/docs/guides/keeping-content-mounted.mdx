@@ -1,0 +1,60 @@
+---
+title: Keeping content mounted
+description: When Floaty children stay mounted without an anchor, and when they unmount.
+---
+
+`keepMounted` on `<Floaty>` controls whether its children stay in the React tree when there
+is no active anchor. While they stay mounted but have no anchor, they are hidden
+(`visibility: hidden`, `aria-hidden`) and keep their last known size.
+
+```tsx
+<Floaty floatyId="player" keepMounted>              {/* default */}
+<Floaty floatyId="chart" keepMounted="afterAnchor">
+<Floaty floatyId="modal" keepMounted={false}>
+```
+
+| `keepMounted` | Before the first anchor | While no anchor exists later |
+| --- | --- | --- |
+| `true` (default) | Mounted, hidden, `0 × 0` | Mounted, hidden, last size |
+| `'afterAnchor'` | Not mounted | Mounted, hidden, last size |
+| `false` | Not mounted | Not mounted (state is lost) |
+
+## `true` (default)
+
+Content mounts as soon as `<Floaty>` does, even if no anchor exists yet. That lets work
+start early: media can begin loading, subscriptions can open, and React state survives
+while the content is between anchors (after the
+[grace period](/docs/guides/multiple-anchors#removing-active-anchor) ends).
+
+The trade-off is the first mount. Before any anchor has been measured there is no size to
+take, so the box is `0 × 0`. Content that only reads its container size on mount will
+measure zero.
+
+## `'afterAnchor'`
+
+Use this for content that sizes itself from its container on mount: charts, maps,
+canvases, video players, virtualized lists.
+
+```tsx
+<Floaty floatyId="chart" keepMounted="afterAnchor">
+  <Chart />
+</Floaty>
+```
+
+The children mount once the first anchor has a measured rect, already at that size (even
+for layout effects inside the content). After that they behave like the default: they stay
+mounted and sized while no anchor exists.
+
+## `false`
+
+Children unmount whenever there is no active anchor. Mounting them again starts from a
+fresh tree, so React state, media playback and subscriptions are lost. Prefer this when
+the content is cheap to recreate, or when keeping a hidden instance around would be wrong
+(for example a modal that must not linger in the accessibility tree even while hidden —
+though the default already sets `aria-hidden` while hidden).
+
+## Remounting `<Floaty>`
+
+Hidden content always keeps the last known size in the store, including when `<Floaty>`
+itself remounts. The next mount can therefore start at the previous size instead of
+`0 × 0`, as long as an anchor had been measured before.

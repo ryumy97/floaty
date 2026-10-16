@@ -29,3 +29,23 @@ Floating content is rendered into a layer at the end of `body` (DOM) from wherev
   layer and inert. Render such content directly inside the dialog instead.
 - **`inert` and `aria-hidden`** on the anchor's ancestors don't affect the content.
 - **Focus order** follows the DOM, so floating content comes last when tabbing.
+
+## Stacking and z-index
+
+Every `<Floaty>` portals into one shared overlay (`[data-floaty-layer]`). That layer has a
+single `z-index` (default `1000`), so:
+
+- Floating content sits above ordinary page UI as a group. It cannot sit *between* two
+  page elements that use different `z-index` values — raise or lower the whole layer, or
+  keep those elements outside the layer.
+- Floaties among themselves stack in mount order (later mounts draw on top). There is no
+  per-`floatyId` z-index.
+- The browser's **top layer** (`<dialog>`, popovers, fullscreen) always paints above the
+  floaty layer. Content that must appear inside those surfaces should render there, not
+  through `<Floaty>` (same rule as the Modals bullet above).
+
+```ts
+configureFloaty({ zIndex: 50 }); // below a page chrome that uses z-index: 100
+```
+
+See [`configureFloaty`](/docs/api/configure-floaty) for the full options.

@@ -14,7 +14,7 @@ description: Renders content once, on top of the page, over the active anchor.
 | `floatyId` | `string` | required |
 | `children` | `ReactNode \| (state, { hasAnchor, isAnimating, settledState }) => ReactNode` | |
 | `transition` | `false`, easing or spring ([Transitions](/docs/guides/transitions)) | global default |
-| `keepMounted` | `true \| 'afterAnchor' \| false` ([Self-measuring content](/docs/guides/self-measuring-content)) | `true` |
+| `keepMounted` | `true \| 'afterAnchor' \| false` ([Keeping content mounted](/docs/guides/keeping-content-mounted)) | `true` |
 | `animateLayoutChanges` | `boolean`: also animate when the active anchor itself moves or resizes | `true` |
 | `className` / `style` | Styling of the visible box around `children` (avoid `transform`, `width`, `height`) | |
 | `onTransitionStart` / `onTransitionEnd` | `() => void` | |
