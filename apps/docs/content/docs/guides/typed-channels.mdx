@@ -3,9 +3,9 @@ title: Typed channels
 description: Bind the components and hooks to one id and one state type.
 ---
 
-With string ids, every call site picks its own state type, and a typo in an id silently
-shows nothing. `createFloaty<S>(floatyId)` binds the components and hooks to one id and
-types its anchor `state`. Call it once at module scope:
+We can create a typed channel with `createFloaty<S>(floatyId)`. 
+It contains components and hooks that shares the same state.
+
 
 ```tsx title="player.ts"
 import { createFloaty } from '@floaty/react';
@@ -27,10 +27,9 @@ function StatusBar() {
 }
 ```
 
-The channel has `floatyId`, `Floaty`, `FloatyAnchor`, `useFloaty`, `useFloatyState` and
-`useFloatyTransition`. They take the same props and return the same values as the unbound
-API, without `floatyId`. They share the global store, so they mix freely with
-`<Floaty floatyId="player">`. The bound `useFloatyState()` and `useFloatyTransition()` also
-throw if called inside another id's content.
+Using typed channels, we can avoid having to provide id to the components and hooks all the time.
+We can create a channel and reuse it in multiple places.
 
-Keep using the unbound API for dynamic ids, such as one per list item.
+The channel has `floatyId`, `Floaty`, `FloatyAnchor`, `useFloaty`, `useFloatyState` and `useFloatyTransition`. 
+They take the same props and return the same values as the unbound API.
+
