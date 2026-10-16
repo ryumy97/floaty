@@ -81,7 +81,7 @@ flowchart LR
     AnchorB["FloatyAnchor floatyId=player"]
   end
   Store[("zustand store")]
-  Layer["Overlay layer on document.body"]
+  Layer["Private overlay layer on document.body"]
 
   AnchorA -->|"unregister"| Store
   AnchorB -->|"register + measure"| Store
@@ -96,7 +96,7 @@ src/
   index.ts           Public exports
   types.ts           Shared types: FloatyRect, FloatySnapshot, FloatyTransition, ...
   store.ts           zustand store: anchor stacks, snapshots, config; geometry helpers
-  layer.ts           Shared overlay layer: lazy creation, ref counting, config styling
+  layer.ts           Per-Floaty overlay layer: create on mount, style from zIndex/config
   Floaty.tsx         Content component: portal, positioning, animation decisions
   FloatyAnchor.tsx   Placeholder component: registration, active-state subscription
   useRectTracker.ts  Measurement triggers for the active anchor (resize, scroll, RO, moves)
@@ -276,9 +276,9 @@ Only the **active** anchor installs listeners, so the cost is per `floatyId`, no
 
 ### 6.3 `Floaty`
 
-1. Acquires the shared layer via `useFloatyLayer()` (section 8), and claims its
-   `floatyId` with a per-instance token. **One `Floaty` per `floatyId`:** if several are
-   mounted, only the first one renders and positions; the others render `null` (and a
+1. Acquires a private overlay layer via `useFloatyLayer(zIndex)` (section 8), and claims
+   its `floatyId` with a per-instance token. **One `Floaty` per `floatyId`:** if several
+   are mounted, only the first one renders and positions; the others render `null` (and a
    development warning is logged once per id). When the first unmounts, the next one in
    mount order takes over with freshly mounted content. A `Floaty` only clears
    `isAnimating` on unmount if it was running the transition itself, so an idle duplicate
@@ -563,16 +563,20 @@ transitions whose missing fields come from the base when it is an easing, or fro
 
 ## 8. Overlay layer lifecycle (`src/layer.ts`)
 
-- A single `div[data-floaty-layer]` is appended to `document.body`, styled
-  `position: absolute; top: 0; left: 0; width: 0; height: 0; pointer-events: none` (the
-  document origin, section 7.1). Each floaty's outer element also has
-  `pointer-events: none` and its inner (visible) element sets `pointer-events: auto`, so
-  only the visible content captures input, including mid-transition.
-- **Ref-counted.** Each mounted `Floaty` acquires the layer in a layout effect and releases
-  it on cleanup. The layer is created on first acquire and removed on last release. This is
-  safe under React StrictMode's double effect invocation (acquire, release, acquire).
-- **Reactive config.** While the layer exists, it subscribes to the store and re-applies
-  `zIndex` and `layerClassName` when `config` changes.
+- Each mounted `Floaty` owns a private `div[data-floaty-layer]` appended to
+  `document.body`, styled `position: absolute; top: 0; left: 0; width: 0; height: 0;
+  pointer-events: none` (the document origin, section 7.1). The floaty's outer element
+  also has `pointer-events: none` and its inner (visible) element sets
+  `pointer-events: auto`, so only the visible content captures input, including
+  mid-transition.
+- **Per instance.** The layer is created in a layout effect and removed on cleanup. StrictMode's
+  double effect invocation tears down and recreates it (portal remounts; positioning
+  forgets the previous outer and places the new one). Idle duplicate `Floaty`s for the
+  same id still create a layer, but render `null` into it.
+- **z-index.** `Floaty`'s `zIndex` prop overrides `config.zIndex` (default 1000) on that
+  layer only, so floaties can interleave with page stacking contexts. `layerClassName`
+  from config is applied to every layer. Both update from a store subscription without
+  recreating the element.
 
 ## 9. Commit-phase timing (critical invariant)
 
@@ -694,7 +698,7 @@ heavy content, a future `sizeMode: 'scale'` option could animate `scale` instead
 | Transformed `html`/`body` | A `transform`, `filter` or `contain` on `html` or `body` makes them the containing block for fixed elements, so fixed placement would be offset. |
 | Moves during scrolling snap | Moves without resize are detected by the move observer (section 6.2), but one reported within 100 ms of a scroll is treated as part of the scroll and snaps. Without `IntersectionObserver`, such moves are not detected; call `useFloaty(id).remeasure()`. |
 | Delayed hiding | Because of the grace period (section 9.1), content stays visible at its last position for `anchorGracePeriod` ms after the last anchor unmounts, and `useFloaty().hasAnchor` stays `true` until it ends. Anchors that arrive later than the window (slow network loads) still snap. Tune it with `configureFloaty({ anchorGracePeriod })`. |
-| Stacking context | All floaties share the layer's `zIndex`; they cannot interleave with page elements at different z-levels. Order among floaties follows mount order. |
+| Stacking context | Each floaty has its own layer and `zIndex` (prop or global default). Floaties that share a z-index stack in mount order. The browser top layer (`<dialog>`, popovers) still paints above all of them. |
 | Content not in server HTML | See section 11. |
 | Unsized before the first anchor | With the default `keepMounted`, content mounted before any anchor was measured has a `0 × 0` box. Use `keepMounted="afterAnchor"` for self-measuring content (section 6.3). |
 | Focus order | Floating content is at the end of `body` in DOM order, so keyboard tab order differs from visual order. Consider managing focus or `tabIndex` in sensitive UIs. |
@@ -740,7 +744,6 @@ What this means in practice:
 ## 14. Extension points and future work
 
 - **`sizeMode: 'scale'`**: animate `scale` instead of `width`/`height` for heavy content.
-- **Per-floaty layers or `zIndex`**: allow interleaving with page content.
 - **Clipping helpers**: optional intersection-based hiding or `clip-path` from scroll ancestors.
 - **Scoped stores**: an optional `createFloatyScope()` for apps that need isolation
   (multiple roots, SSR per request), without bringing back a required provider. Typed
@@ -777,7 +780,8 @@ Coverage by behavior:
   easing rides along with mid-flight layout shifts; springs absorb them into the gap;
   spring keyframes are sampled and end at rest; spring and partial-easing resolution
   against a spring global default.
-- Global defaults through `configureFloaty`; reactive `zIndex`/`layerClassName`.
+- Global defaults through `configureFloaty`; per-Floaty layers with `zIndex` prop and
+  reactive `layerClassName`.
 - `keepMounted` true (hidden, preserved) versus false (unmounted, reset).
 - First mount (`tests/firstMount.test.tsx`): default content mounts hidden and unsized;
   `'afterAnchor'` waits for the first anchor, mounts at its size as seen from the
@@ -813,8 +817,8 @@ Coverage by behavior:
 - Transition lifecycle (`tests/lifecycle.test.tsx`): anchor switch mid-flight (easing
   restarts from the current gap, springs carry velocity, one start/end pair); anchor
   disappearing, snapping (`transition={false}`, reduced motion) and unmounting mid-flight;
-  StrictMode (single layer, anchor stack, animation); one ref-counted layer across several
-  `Floaty`s; `bounceSize` with its own spring; anchors mounting in a later commit (stays
+  StrictMode (single layer, anchor stack, animation); one private layer per `Floaty`;
+  `bounceSize` with its own spring; anchors mounting in a later commit (stays
   visible during the grace period, animates into an anchor arriving within it, retargets a
   running transition, hides and snaps after it, anchor gated on a later state update).
 - Grace period in the store (`tests/animate.test.ts`): direct switch within the window,

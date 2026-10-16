@@ -55,6 +55,12 @@ export interface FloatyProps<S = unknown> {
   keepMounted?: boolean | 'afterAnchor';
   /** Animate when the active anchor itself moves or resizes. Defaults to `true`. */
   animateLayoutChanges?: boolean;
+  /**
+   * z-index of this floaty's overlay layer. Overrides the global default from
+   * `configureFloaty({ zIndex })` (1000). Each `<Floaty>` has its own layer, so
+   * different values can interleave with page UI.
+   */
+  zIndex?: number;
   /** Applied to the visible box that wraps `children`. */
   className?: string;
   /** Applied to the visible box; avoid `transform`, `width` and `height`. */
@@ -64,9 +70,10 @@ export interface FloatyProps<S = unknown> {
 }
 
 /**
- * Renders `children` once, in a shared overlay layer, positioned over the
- * active `<FloatyAnchor>` with the same `floatyId`. Place it somewhere that
- * stays mounted across layout changes so its children keep their state.
+ * Renders `children` once, in a private overlay layer on `document.body`,
+ * positioned over the active `<FloatyAnchor>` with the same `floatyId`. Place
+ * it somewhere that stays mounted across layout changes so its children keep
+ * their state.
  */
 export function Floaty<S = unknown>({
   floatyId,
@@ -74,12 +81,13 @@ export function Floaty<S = unknown>({
   transition,
   keepMounted = true,
   animateLayoutChanges = true,
+  zIndex,
   className,
   style,
   onTransitionStart,
   onTransitionEnd,
 }: FloatyProps<S>) {
-  const layer = useFloatyLayer();
+  const layer = useFloatyLayer(zIndex);
   // Only what affects rendering; rect changes are applied without re-rendering.
   const select = selectSnapshot(floatyId);
   const anchor = useStore(floatyStore, (s) => select(s).anchor);

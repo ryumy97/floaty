@@ -198,7 +198,7 @@ describe('StrictMode and multiple floaties', () => {
     expect(get().style.transform).toBe('translate3d(1px, 2px, 0)');
   });
 
-  it('shares one ref-counted layer across several Floaty components', () => {
+  it('gives each Floaty its own layer and removes it on unmount', () => {
     function Two({ first, second }: { first: boolean; second: boolean }) {
       return (
         <>
@@ -209,8 +209,8 @@ describe('StrictMode and multiple floaties', () => {
     }
     const layers = () => document.querySelectorAll('[data-floaty-layer]');
     const { rerender } = render(<Two first second />);
-    expect(layers()).toHaveLength(1);
-    expect(layers()[0].children).toHaveLength(2);
+    expect(layers()).toHaveLength(2);
+    expect([...layers()].map((layer) => layer.children.length)).toEqual([1, 1]);
 
     rerender(<Two first={false} second />);
     expect(layers()).toHaveLength(1);

@@ -68,9 +68,9 @@ Global options; can be called at any time (changes apply immediately).
 
 | Option | Type | Default |
 | --- | --- | --- |
-| `zIndex` | `number` | `1000` |
+| `zIndex` | `number`: default for each floaty's overlay layer | `1000` |
 | `transition` | easing or spring (see [Transitions](#transitions)) | `{ duration: 300, easing: 'ease-in-out' }` |
-| `layerClassName` | `string` | |
+| `layerClassName` | `string`: class on every overlay layer | |
 | `anchorGracePeriod` | `number`: ms the last anchor stays active after it unmounts (see below); `0` releases immediately | `150` |
 
 `resetFloaty()` restores the initial state (useful between tests).
@@ -113,6 +113,7 @@ warning is logged in development); when it unmounts, the next one takes over.
 | `transition` | `false`, easing or spring (see [Transitions](#transitions)) | global default |
 | `keepMounted` | `true`: keep children mounted (hidden) while no anchor exists; `'afterAnchor'`: the same, but wait for a size before mounting them the first time (see below); `false`: unmount them | `true` |
 | `animateLayoutChanges` | `boolean`: also animate when the active anchor itself moves or resizes | `true` |
+| `zIndex` | `number`: z-index of this floaty's overlay layer (overrides the global default) | global default |
 | `className` / `style` | styling of the visible box around `children` (avoid `transform`, `width`, `height`) | |
 | `onTransitionStart` / `onTransitionEnd` | `() => void` | |
 
@@ -250,8 +251,8 @@ render `<Floaty>` and `<FloatyAnchor>` directly.
 
 ### Portal side effects
 
-Floating content is rendered into a layer at the end of `body` (DOM) from wherever
-`<Floaty>` is placed (React). It is never inside the anchor, so:
+Floating content is rendered into a private layer per `<Floaty>` at the end of `body`
+(DOM) from wherever `<Floaty>` is placed (React). It is never inside the anchor, so:
 
 - **CSS** inherits from `body` and the layer, not the anchor's ancestors: theme classes,
   CSS variables, fonts and colors set on a page wrapper don't reach it, and selectors like
@@ -264,6 +265,8 @@ Floating content is rendered into a layer at the end of `body` (DOM) from wherev
   `target.closest('[data-floaty]')`.
 - **Forms and modals**: inputs aren't part of a `<form>` around the anchor (use the `form`
   attribute), and content anchored inside a modal `<dialog>` is covered and inert.
+- **Stacking**: each layer has its own `zIndex` (`Floaty` prop or the global default), so
+  floaties can interleave with page UI. The browser top layer still paints above them.
 
 See section 12.1 of [`ARCHITECTURE.md`](./ARCHITECTURE.md) for the full list.
 

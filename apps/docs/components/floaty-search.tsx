@@ -30,6 +30,8 @@ const search = createFloaty<{ form: Form; round?: boolean }>('docs-search');
 
 const HEADER = 48;
 const MAX_LIST = 400;
+/** Above other floaties; the dimmed backdrop sits one step below. */
+const SEARCH_Z = 1100;
 
 function TriggerAnchor({ form, className }: { form: Form; className?: string }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -79,10 +81,8 @@ export function FloatySearchDialog({ open, onOpenChange }: SharedProps) {
   const { search: query, onSearchChange, data } = useFetchSearch({ api: '/api/search' });
   const results = useMemo(() => (query && data ? flatten(data.items) : []), [query, data]);
   const [listHeight, setListHeight] = useState(0);
-  const [layer, setLayer] = useState<Element | null>(null);
-
-  // The backdrop goes in the overlay layer, under the search box, to cover other floaties.
-  useEffect(() => setLayer(document.querySelector('[data-floaty-layer]')), []);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
   useEffect(() => {
     // Fumadocs' own triggers (`data-search`, e.g. in the collapsed sidebar's toolbar) open a
@@ -118,7 +118,7 @@ export function FloatySearchDialog({ open, onOpenChange }: SharedProps) {
 
   return (
     <>
-      <search.Floaty transition={{ type: 'spring', duration: 500, bounce: 0.18 }}>
+      <search.Floaty zIndex={SEARCH_Z} transition={{ type: 'spring', duration: 500, bounce: 0.18 }}>
         <SearchBox
           open={open}
           onOpenChange={onOpenChange}
@@ -130,17 +130,18 @@ export function FloatySearchDialog({ open, onOpenChange }: SharedProps) {
           onListResize={setListHeight}
         />
       </search.Floaty>
-      {layer &&
+      {mounted &&
         createPortal(
           <div
             aria-hidden
             data-open={open}
             onClick={() => onOpenChange(false)}
-            className="pointer-events-none fixed inset-0 z-1 bg-black/40 opacity-0 backdrop-blur-md transition-opacity duration-300 data-[open=true]:pointer-events-auto data-[open=true]:opacity-100 dark:bg-black/60"
+            className="pointer-events-none fixed inset-0 bg-black/40 opacity-0 backdrop-blur-md transition-opacity duration-300 data-[open=true]:pointer-events-auto data-[open=true]:opacity-100 dark:bg-black/60"
+            style={{ zIndex: SEARCH_Z - 1 }}
           />,
-          layer,
+          document.body,
         )}
-      {layer &&
+      {mounted &&
         open &&
         createPortal(
           <search.FloatyAnchor

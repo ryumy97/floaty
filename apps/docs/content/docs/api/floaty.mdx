@@ -1,6 +1,6 @@
 ---
 title: <Floaty>
-description: Renders content once, on top of the page, over the active anchor.
+description: Render component that floats to the anchor's position.
 ---
 
 ```tsx
@@ -16,6 +16,7 @@ description: Renders content once, on top of the page, over the active anchor.
 | `transition` | `false`, easing or spring ([Transitions](/docs/guides/transitions)) | global default |
 | `keepMounted` | `true \| 'afterAnchor' \| false` ([Keeping content mounted](/docs/guides/keeping-content-mounted)) | `true` |
 | `animateLayoutChanges` | `boolean`: also animate when the active anchor itself moves or resizes | `true` |
+| `zIndex` | `number`: z-index of this floaty's overlay layer ([Stacking](/docs/guides/portal-side-effects#stacking-and-z-index)) | global default |
 | `className` / `style` | Styling of the visible box around `children` (avoid `transform`, `width`, `height`) | |
 | `onTransitionStart` / `onTransitionEnd` | `() => void` | |
 

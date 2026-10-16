@@ -9,9 +9,9 @@ configureFloaty({ zIndex: 1000, transition: { type: 'spring', duration: 400, bou
 
 | Option | Type | Default |
 | --- | --- | --- |
-| `zIndex` | `number`: z-index of the shared overlay layer | `1000` |
+| `zIndex` | `number`: default z-index for each floaty's overlay layer (overridable per `<Floaty>`) | `1000` |
 | `transition` | Easing or spring ([Transitions](/docs/guides/transitions)) | `{ duration: 300, easing: 'ease-in-out' }` |
-| `layerClassName` | `string`: class on the overlay layer, for themes and inherited styles | |
+| `layerClassName` | `string`: class on every overlay layer, for themes and inherited styles | |
 | `anchorGracePeriod` | `number`: ms the last anchor stays active after it unmounts; `0` releases immediately | `150` |
 
 Options can be changed at any time. `resetFloaty()` restores the initial state, which is

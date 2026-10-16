@@ -162,12 +162,39 @@ describe('Floaty', () => {
     expect(animations[0].options).toEqual({ duration: 42, easing: 'ease-out' });
   });
 
-  it('applies zIndex and layerClassName from configureFloaty to the layer', () => {
+  it('applies zIndex and layerClassName from configureFloaty to each layer', () => {
     render(<App layout="a" />);
     expect(layer()!.style.zIndex).toBe('1000');
     act(() => configureFloaty({ zIndex: 7, layerClassName: 'my-layer' }));
     expect(layer()!.style.zIndex).toBe('7');
     expect(layer()!.className).toBe('my-layer');
+  });
+
+  it('overrides the layer z-index with the Floaty zIndex prop', () => {
+    const { rerender } = render(<App layout="a" floatyProps={{ zIndex: 42 }} />);
+    expect(layer()!.style.zIndex).toBe('42');
+    act(() => configureFloaty({ zIndex: 7 }));
+    expect(layer()!.style.zIndex).toBe('42');
+    rerender(<App layout="a" floatyProps={{ zIndex: 99 }} />);
+    expect(layer()!.style.zIndex).toBe('99');
+  });
+
+  it('stacks separate Floaty layers by their zIndex', () => {
+    render(
+      <>
+        <Floaty floatyId="low" zIndex={10}>
+          low
+        </Floaty>
+        <Floaty floatyId="high" zIndex={50}>
+          high
+        </Floaty>
+        <div style={{ position: 'relative', zIndex: 30 }}>mid</div>
+      </>,
+    );
+    const layers = document.querySelectorAll<HTMLElement>('[data-floaty-layer]');
+    expect(layers).toHaveLength(2);
+    expect(layers[0].style.zIndex).toBe('10');
+    expect(layers[1].style.zIndex).toBe('50');
   });
 
   it('hides but keeps content mounted when there is no anchor (keepMounted)', () => {

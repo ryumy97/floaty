@@ -36,11 +36,11 @@ export function resolveTransition(
 }
 
 export interface FloatyConfig {
-  /** z-index of the overlay layer. Defaults to 1000. */
+  /** Default z-index for each floaty's overlay layer. Defaults to 1000. */
   zIndex: number;
   /** Default transition for every `<Floaty>`. */
   transition: FloatyTransitionConfig;
-  /** Class name applied to the overlay layer. */
+  /** Class name applied to every overlay layer. */
   layerClassName?: string;
   /**
    * How long (ms) the last anchor stays active after it unmounts, so an anchor that

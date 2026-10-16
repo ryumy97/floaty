@@ -3,12 +3,12 @@ title: Portal side effects
 description: What changes because content is rendered outside the anchor.
 ---
 
-Floating content is rendered into a layer at the end of `body` (DOM) from wherever
-`<Floaty>` is placed (React). It is never inside the anchor.
+Floating content is rendered into a private overlay layer per `<Floaty>` at the end of
+`body` (DOM) from wherever `<Floaty>` is placed (React). It is never inside the anchor.
 
 | Tree | Parent of the content | Determines |
 | --- | --- | --- |
-| DOM | The layer at the end of `body` | CSS inheritance and selectors, native events, forms, inertness |
+| DOM | That floaty's layer at the end of `body` | CSS inheritance and selectors, native events, forms, inertness |
 | React | Wherever `<Floaty>` is rendered | Context, React events, error boundaries, `Suspense` |
 | Visual | The anchor's rect | Position and size only |
 
@@ -32,20 +32,17 @@ Floating content is rendered into a layer at the end of `body` (DOM) from wherev
 
 ## Stacking and z-index
 
-Every `<Floaty>` portals into one shared overlay (`[data-floaty-layer]`). That layer has a
-single `z-index` (default `1000`), so:
+Each `<Floaty>` portals into its own overlay layer on `body` (`[data-floaty-layer]`).
+Layers share the default `z-index` from `configureFloaty` (1000), and a single floaty can
+override it:
 
-- Floating content sits above ordinary page UI as a group. It cannot sit *between* two
-  page elements that use different `z-index` values — raise or lower the whole layer, or
-  keep those elements outside the layer.
-- Floaties among themselves stack in mount order (later mounts draw on top). There is no
-  per-`floatyId` z-index.
-- The browser's **top layer** (`<dialog>`, popovers, fullscreen) always paints above the
-  floaty layer. Content that must appear inside those surfaces should render there, not
-  through `<Floaty>` (same rule as the Modals bullet above).
-
-```ts
-configureFloaty({ zIndex: 50 }); // below a page chrome that uses z-index: 100
+```tsx
+<Floaty floatyId="tooltip" zIndex={50}>…</Floaty>
+<Floaty floatyId="modal" zIndex={100}>…</Floaty>
 ```
 
-See [`configureFloaty`](/docs/api/configure-floaty) for the full options.
+```ts
+configureFloaty({ zIndex: 50 }); // default for every Floaty without its own zIndex
+```
+
+See [`<Floaty>`](/docs/api/floaty) and [`configureFloaty`](/docs/api/configure-floaty).
