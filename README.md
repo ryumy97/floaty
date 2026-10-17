@@ -1,47 +1,77 @@
 # Floaty
 
-Render content **on top of the screen** that follows layout placeholders, so it **keeps its
-state** when the surrounding layout switches from one structure to another (grid to list,
-page to sidebar, expanded to mini player, ...).
+Making easier to manage floating components.
 
-## Packages
 
-| Package | Description |
-| --- | --- |
-| [`@floaty/react`](packages/react) | React components and hooks ([README](packages/react/README.md), [architecture](packages/react/ARCHITECTURE.md)) |
+In React, changing layout would often unmount and remount resulting loosing states inside the components.
 
-Vue and Svelte bindings are planned; they will share a framework-agnostic `@floaty/core`.
+Floaty lets React component move between places in your layout without remounting by separating **what** is rendered from **where** it appears.
 
-## Repository layout
-
-```text
-packages/
-  react/         @floaty/react: the library, unit tests (Vitest + jsdom)
-apps/
-  demo-vite/     Playground on Vite              http://localhost:5199
-  demo-next/     Examples on Next.js (App Router)   http://localhost:5200
-                 (multi-page examples with client-side navigation)
-  docs/          Documentation site (Next.js + Fumadocs) http://localhost:5300
-e2e/             Playwright specs for both demos
-```
-
-## Development
-
-Requires Node.js 20+ and pnpm 10. Tasks run through [Turborepo](https://turborepo.com),
-which builds workspace dependencies first and caches results.
+## Get Started
 
 ```bash
-pnpm install
-pnpm dev          # Vite demo, with the library rebuilding on change
-pnpm dev:next     # Next.js demo, with the library rebuilding on change
-pnpm dev:docs     # docs site
-
-pnpm test         # unit tests
-pnpm test:e2e     # Playwright against both demos' production builds
-                  # (first run: pnpm --filter @floaty/e2e exec playwright install chromium)
-pnpm typecheck
-pnpm lint         # Biome: lint, format and import order (pnpm lint:fix to apply fixes)
-pnpm build
+pnpm add @floaty/react
 ```
 
-See [AGENTS.md](AGENTS.md) for conventions.
+- `<Floaty>` renders your content **once**, in a layer on top of the page. Put it in a
+  shell that stays mounted and its state survives every layout change (including Next.js
+  client navigations).
+- `<FloatyAnchor>` is an empty placeholder in your layouts. It reserves space; the floating
+  content is drawn over whichever anchor is active.
+
+## Examples
+
+This example describes an simple counter persisting and state between layout shift.
+
+```jsx
+import { Floaty, FloatyAnchor } from '@floaty/react';
+import { useState } from 'react';
+
+function Counter() {
+  const [count, setCount] = useState(0);
+  return (
+    <button
+      type="button"
+      onClick={() => setCount(count + 1)}
+      style={{ width: '100%', height: '100%' }}
+    >
+      Clicked {count} times
+    </button>
+  );
+}
+
+export default function App() {
+  const [docked, setDocked] = useState(false);
+  return (
+    <>
+      <Floaty floatyId="counter">
+        <Counter />
+      </Floaty>
+
+      <button type="button" onClick={() => setDocked(!docked)}>
+        {docked ? 'Move to main' : 'Dock to sidebar'}
+      </button>
+
+      <div style={{ display: 'flex', gap: 16, marginTop: 16, height: 200 }}>
+        <main style={{ flex: 1 }}>
+          {!docked && <FloatyAnchor floatyId="counter" style={{ height: 200 }} />}
+        </main>
+        <aside style={{ width: 160 }}>
+          {docked && <FloatyAnchor floatyId="counter" style={{ height: 48 }} />}
+        </aside>
+      </div>
+    </>
+  );
+}
+```
+
+For more examples visit 
+<!-- Link here -->
+
+## Documentation
+
+<!-- TODO: url here -->
+
+## License
+
+MIT
