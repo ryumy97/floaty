@@ -2,7 +2,6 @@
 
 Making easier to manage floating components.
 
-
 In React, changing layout would often unmount and remount resulting loosing states inside the components.
 
 Floaty lets React component move between places in your layout without remounting by separating **what** is rendered from **where** it appears.
