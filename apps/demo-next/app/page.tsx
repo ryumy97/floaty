@@ -19,8 +19,8 @@ const EXAMPLES = [
   {
     href: '/homes',
     title: 'Home search with a shared map',
-    text: 'One interactive map moves between the split view, a full-screen map and a listing preview, keeping its pan and zoom.',
-    shows: 'self-measuring content, anchor state changing behavior',
+    text: 'Each listing card flies from the results list and map strip into the detail page, while one interactive map keeps its pan and zoom across every page.',
+    shows: 'one floatyId per listing, shared map, anchor state changing behavior',
   },
   {
     href: '/acme',

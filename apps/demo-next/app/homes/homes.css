@@ -1,6 +1,24 @@
-/* The list and map pages fill the viewport like an app; the listing page scrolls. */
+/* Above selected listing floaties (z-index 1100) and the map (1000). */
+.ex.homes .ex-header {
+  position: sticky;
+  top: 0;
+  z-index: 1200;
+  background: white;
+}
+
+/* The list and map pages fill the viewport like an app; the listing page scrolls.
+   Lock html/body too: listing floaties are position:absolute on body and would
+   otherwise extend the document scroll area past the viewport. */
+html:has(.ex.homes .map-split),
+html:has(.ex.homes .map-full),
+body:has(.ex.homes .map-split),
+body:has(.ex.homes .map-full) {
+  height: 100%;
+  overflow: hidden;
+}
+
 .ex.homes:has(.map-split, .map-full) {
-  height: 100vh;
+  height: 100%;
   min-height: 0;
   padding-bottom: 0;
   display: flex;
@@ -16,6 +34,7 @@
 }
 
 .homes-results {
+  min-height: 0;
   overflow: auto;
   padding: 20px 24px;
 }
@@ -61,41 +80,213 @@
   flex: 0 0 300px;
 }
 
-.homes-strip .homes-photo {
-  width: 96px;
+.homes-card-link {
+  display: block;
+  color: inherit;
+  text-decoration: none;
 }
 
-.homes-card {
-  display: flex;
-  gap: 14px;
-  padding: 10px;
+.homes-slot.card {
+  height: 128px;
   border-radius: 12px;
+  background: #e8eae4;
+}
+
+.homes-slot.strip {
+  height: 96px;
+  border-radius: 12px;
+  background: #e8eae4;
+}
+
+.homes-slot.detail {
+  display: block;
+  border-radius: 14px;
+}
+
+.homes-sizer {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.homes-floaty {
+  border-radius: inherit;
+  overflow: hidden;
+}
+
+/*
+ * Inner morph rides the same --flight as the Floaty spring. Form class switches
+ * at take-off; photo and copy ease during the flight.
+ *
+ * The sizer (in-page, not inside .homes-floaty) stays in normal flow so the
+ * detail anchor gets a real height. The floating copy uses absolute edges so
+ * card ↔ detail can interpolate without a flex-direction snap.
+ */
+.homes-item {
+  --flight: 450ms;
+  --morph-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --pad: 10px;
+  --photo-w: 140px;
+  --gap: 14px;
+  position: relative;
+  display: flex;
+  gap: var(--gap);
+  width: 100%;
+  height: 100%;
+  padding: var(--pad);
+  box-sizing: border-box;
+  border-radius: inherit;
   background: white;
   border: 1px solid #e8e8ef;
+  transition:
+    padding var(--flight) var(--morph-ease),
+    background-color var(--flight) var(--morph-ease),
+    border-color var(--flight) var(--morph-ease);
 }
 
-.homes-card:hover {
-  border-color: #0f766e;
+.homes-item.strip {
+  --photo-w: 96px;
 }
 
-.homes-card > div:last-child {
-  display: flex;
+.homes-item.detail {
   flex-direction: column;
-  gap: 2px;
+  gap: 0;
+  height: auto;
+  padding: 0;
+  border-color: transparent;
+  background: transparent;
+  pointer-events: auto;
 }
 
-.homes-photo,
-.homes-hero {
+.homes-item .homes-photo {
+  flex-shrink: 0;
+  width: var(--photo-w);
+  aspect-ratio: 4 / 3;
+  border-radius: 8px;
   background:
     linear-gradient(transparent 55%, hsl(var(--hue) 25% 35%) 55% 58%, transparent 58%),
     linear-gradient(160deg, hsl(var(--hue) 60% 80%), hsl(calc(var(--hue) + 30) 40% 55%));
+  transition:
+    width var(--flight) var(--morph-ease),
+    left var(--flight) var(--morph-ease),
+    right var(--flight) var(--morph-ease),
+    top var(--flight) var(--morph-ease),
+    bottom var(--flight) var(--morph-ease),
+    aspect-ratio var(--flight) var(--morph-ease),
+    border-radius var(--flight) var(--morph-ease),
+    margin var(--flight) var(--morph-ease);
 }
 
-.homes-photo {
-  flex-shrink: 0;
-  width: 140px;
-  aspect-ratio: 4 / 3;
-  border-radius: 8px;
+.homes-item.detail .homes-photo {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 14px;
+  margin-bottom: 20px;
+}
+
+.homes-item-body {
+  position: relative;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  min-height: 0;
+  transition:
+    left var(--flight) var(--morph-ease),
+    right var(--flight) var(--morph-ease),
+    top var(--flight) var(--morph-ease),
+    bottom var(--flight) var(--morph-ease),
+    padding-top var(--flight) var(--morph-ease);
+}
+
+.homes-item.detail .homes-item-body {
+  flex: 0 0 auto;
+  gap: 0;
+}
+
+/* Floating instance: absolute edges so layout interpolates with the box. */
+.homes-floaty .homes-item {
+  display: block;
+  padding: 0;
+}
+
+.homes-floaty .homes-photo {
+  position: absolute;
+  left: var(--pad);
+  top: var(--pad);
+  bottom: var(--pad);
+  width: var(--photo-w);
+  aspect-ratio: auto;
+  margin: 0;
+}
+
+.homes-floaty .homes-item.detail .homes-photo {
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: auto;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 14px;
+}
+
+.homes-floaty .homes-item-body {
+  position: absolute;
+  left: calc(var(--pad) + var(--photo-w) + var(--gap));
+  right: var(--pad);
+  top: var(--pad);
+  bottom: var(--pad);
+}
+
+/* padding-top % is relative to width → matches a 16/9 photo + gap. */
+.homes-floaty .homes-item.detail .homes-item-body {
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: auto;
+  padding-top: calc(56.25% + 20px);
+  height: auto;
+}
+
+.homes-price {
+  display: block;
+  margin-bottom: 0;
+  font-size: 1em;
+  font-weight: 700;
+  line-height: 1.25;
+  transition:
+    font-size var(--flight) var(--morph-ease),
+    margin var(--flight) var(--morph-ease);
+}
+
+.homes-item.detail .homes-price {
+  margin-bottom: 4px;
+  font-size: 22px;
+}
+
+.homes-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  opacity: 1;
+  transition: opacity calc(var(--flight) * 0.45) ease-out calc(var(--flight) * 0.35);
+}
+
+.homes-copy[inert] {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity calc(var(--flight) * 0.35) ease-in;
+}
+
+.homes-copy-detail p {
+  margin: 0 0 0.5em;
+}
+
+.homes-blurb {
+  margin: 0.75em 0 0;
 }
 
 .homes-detail {
@@ -109,12 +300,6 @@
   display: inline-block;
   margin-bottom: 12px;
   color: #0f766e !important;
-}
-
-.homes-hero {
-  aspect-ratio: 16 / 9;
-  border-radius: 14px;
-  margin-bottom: 20px;
 }
 
 .homes-price {
@@ -236,8 +421,12 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .homes-item,
+  .homes-item .homes-photo,
+  .homes-price,
+  .homes-copy,
   .map-world,
   .map-marker {
-    transition: none;
+    transition: none !important;
   }
 }

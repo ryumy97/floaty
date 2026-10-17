@@ -28,9 +28,14 @@ test.describe('gallery', () => {
     await expectSettled(page, 'photo-salt');
     await tag(photo(page, 'salt'));
 
+    const layerZ = (id: string) =>
+      page.locator(`[data-floaty="${id}"]`).evaluate((el) => el.parentElement!.style.zIndex);
+
     await page.getByRole('link', { name: 'Open Salt flats at dusk' }).click();
     await expect(page).toHaveURL(/\/gallery\/photo\/salt$/);
     await expectSettled(page, 'photo-salt', '.gal-modal-anchor');
+    await expect(layerZ('photo-salt')).resolves.toBe('1100');
+    await expect(layerZ('photo-harbor')).resolves.toBe('1000');
     await photo(page, 'salt').getByRole('button', { name: '♡ Like' }).click();
 
     await page.keyboard.press('Escape');
@@ -46,10 +51,16 @@ test.describe('gallery', () => {
     await page.getByRole('link', { name: 'Open Salt flats at dusk' }).click();
     await expectSettled(page, 'photo-salt', '.gal-modal-anchor');
 
+    const layerZ = (id: string) =>
+      page.locator(`[data-floaty="${id}"]`).evaluate((el) => el.parentElement!.style.zIndex);
+
     await photo(page, 'salt').getByRole('link', { name: 'Next photo' }).click();
     await expect(page).toHaveURL(/\/gallery\/photo\/harbor$/);
+    // Incoming photo on top; outgoing stays raised above the grid while it closes.
+    await expect(layerZ('photo-harbor')).resolves.toBe('1100');
     await expectSettled(page, 'photo-harbor', '.gal-modal-anchor');
     await expectSettled(page, 'photo-salt', '.gal-cell[data-floaty-anchor="photo-salt"]');
+    await expect(layerZ('photo-salt')).resolves.toBe('1000');
   });
 
   test('renders the photo page on a full page load', async ({ page }) => {
@@ -59,6 +70,28 @@ test.describe('gallery', () => {
 
     await page.getByRole('link', { name: '← Back to gallery' }).click();
     await expectSettled(page, 'photo-salt', '.gal-cell[data-floaty-anchor="photo-salt"]');
+  });
+
+  test('flies from the modal to the detail page without remounting', async ({ page }) => {
+    await page.goto('/gallery');
+    await expectSettled(page, 'photo-salt');
+    await tag(photo(page, 'salt'));
+
+    await page.getByRole('link', { name: 'Open Salt flats at dusk' }).click();
+    await expectSettled(page, 'photo-salt', '.gal-modal-anchor');
+    await photo(page, 'salt').getByRole('button', { name: '♡ Like' }).click();
+
+    await photo(page, 'salt').getByRole('link', { name: 'Open page' }).click();
+    await expect(page).toHaveURL(/\/gallery\/view\/salt$/);
+    await expect(page.locator('.gal-modal')).toHaveCount(0);
+    await expectSettled(page, 'photo-salt', '.gal-page-anchor');
+    await expect(photo(page, 'salt')).toHaveClass(/\bpage\b/);
+    await expect(photo(page, 'salt').getByLabel('Liked')).toBeVisible();
+    await expectNotRemounted(photo(page, 'salt'));
+
+    await page.getByRole('link', { name: '← Back to gallery' }).click();
+    await expectSettled(page, 'photo-salt', '.gal-cell[data-floaty-anchor="photo-salt"]');
+    await expectNotRemounted(photo(page, 'salt'));
   });
 });
 
@@ -77,15 +110,44 @@ test.describe('homes', () => {
     await expect(map).toHaveAttribute('data-zoom', '1.40');
 
     await map.getByRole('link', { name: '$990K' }).click();
-    await expect(page).toHaveURL(/\/homes\/mill-7$/);
+    await expect(page).toHaveURL(/\/homes\/mill-7\?from=map$/);
     await expectSettled(page, 'homes-map');
     await expect(map).toHaveClass(/\bpreview\b/);
     await expect(map).toHaveAttribute('data-zoom', '1.80');
 
     await page.getByRole('link', { name: '← Back to results' }).click();
+    await expect(page).toHaveURL(/\/homes\/map$/);
     await expectSettled(page, 'homes-map');
     await expect(map).toHaveAttribute('data-zoom', '1.40');
     await expectNotRemounted(map);
+  });
+
+  test('flies a listing item from the list into the detail page', async ({ page }) => {
+    await page.goto('/homes');
+    const item = page.getByTestId('homes-listing-mill-7');
+    await expectSettled(page, 'homes-listing-mill-7');
+    await tag(item);
+    await expect(item).toHaveClass(/\bcard\b/);
+
+    const layerZ = (id: string) =>
+      page.locator(`[data-floaty="${id}"]`).evaluate((el) => el.parentElement!.style.zIndex);
+
+    await page.getByRole('link', { name: '7 Mill Road' }).click();
+    await expect(page).toHaveURL(/\/homes\/mill-7\?from=list$/);
+    await expectSettled(page, 'homes-listing-mill-7');
+    await expect(item).toHaveClass(/\bdetail\b/);
+    await expect(item.getByText('Open house this Saturday')).toBeVisible();
+    await expect(layerZ('homes-listing-mill-7')).resolves.toBe('1100');
+    // Other listings use keepMounted={false} so they unmount off the list
+    // (otherwise abspos ghosts extend document scroll on some detail pages).
+    await expect(page.locator('[data-floaty="homes-listing-elm-12"]')).toHaveCount(0);
+    await expectNotRemounted(item);
+
+    await page.getByRole('link', { name: '← Back to results' }).click();
+    await expect(page).toHaveURL(/\/homes$/);
+    await expectSettled(page, 'homes-listing-mill-7');
+    await expect(item).toHaveClass(/\bcard\b/);
+    await expectNotRemounted(item);
   });
 });
 

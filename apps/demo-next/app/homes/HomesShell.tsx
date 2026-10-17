@@ -1,6 +1,6 @@
 'use client';
 
-import { createFloaty } from '@floaty/react';
+import { createFloaty, Floaty, FloatyAnchor, useFloatyState } from '@floaty/react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -14,12 +14,23 @@ import {
   useState,
 } from 'react';
 import { ExampleHeader } from '../ExampleHeader';
-import { formatPrice, getListing, LISTINGS, type Listing } from './listings';
+import {
+  formatPrice,
+  getListing,
+  LISTINGS,
+  type Listing,
+  type ListingItemState,
+  listingFloatyId,
+  listingPath,
+  type ResultsFrom,
+} from './listings';
 
 interface MapAnchorState {
   form: 'split' | 'full' | 'preview';
   /** Listing to center on; the map goes back to the user's view when it's cleared. */
   focus?: string;
+  /** Preserved on the detail preview so marker clicks keep the back target. */
+  resultsFrom?: ResultsFrom;
 }
 
 /** The one map of the app: its pan and zoom survive every page. */
@@ -36,10 +47,21 @@ function useHover() {
   return value;
 }
 
+const LISTING_Z = 10;
+const HOVER_Z = 20;
+/** Above the map (default 1000) while flying to/from the detail page. */
+const SELECTED_Z = 1100;
+/** Keep in sync with `--flight` on `.homes-item` (inner CSS morph). */
+const FLIGHT_MS = 450;
+
 export function HomesShell({ children }: { children: ReactNode }) {
   const [hovered, setHovered] = useState<string | null>(null);
-  // A card unmounted by navigation never fires mouseleave.
   const pathname = usePathname();
+  const openId = /^\/homes\/(?!map$)([^/]+)$/.exec(pathname)?.[1] ?? null;
+  // Stays raised until the card has landed back in the list/strip.
+  const [raisedId, setRaisedId] = useState<string | null>(null);
+  if (openId && openId !== raisedId) setRaisedId(openId);
+  // A card unmounted by navigation never fires mouseleave.
   const [hoverPath, setHoverPath] = useState(pathname);
   if (hoverPath !== pathname) {
     setHoverPath(pathname);
@@ -61,7 +83,81 @@ export function HomesShell({ children }: { children: ReactNode }) {
       <homesMap.Floaty transition={{ type: 'spring', duration: 500, bounce: 0.1 }}>
         <HomesMap />
       </homesMap.Floaty>
+      {LISTINGS.map((listing) => {
+        const selected = listing.id === raisedId;
+        const zIndex = selected ? SELECTED_Z : listing.id === hovered ? HOVER_Z : LISTING_Z;
+        return (
+          <Floaty
+            key={listing.id}
+            floatyId={listingFloatyId(listing.id)}
+            className="homes-floaty"
+            zIndex={zIndex}
+            // Don't leave hidden cards at their last list Y — that extends the
+            // document scroll area (top items leave ghosts below; bottom items don't).
+            keepMounted={false}
+            // Let wheel events pass through to the list/strip under the cards.
+            style={{ pointerEvents: 'none' }}
+            transition={{ type: 'spring', duration: FLIGHT_MS, bounce: 0.12 }}
+            onTransitionEnd={() => {
+              if (listing.id !== openId) setRaisedId((id) => (id === listing.id ? null : id));
+            }}
+          >
+            <ListingItem listing={listing} />
+          </Floaty>
+        );
+      })}
     </HoverContext.Provider>
+  );
+}
+
+function ListingItem({ listing }: { listing: Listing }) {
+  // Switch at take-off; CSS transitions morph photo/copy during the flight.
+  const form = useFloatyState<ListingItemState>()?.form ?? 'card';
+  return <ListingItemView listing={listing} form={form} testId={`homes-listing-${listing.id}`} />;
+}
+
+function ListingItemView({
+  listing,
+  form,
+  testId,
+}: {
+  listing: Listing;
+  form: ListingItemState['form'];
+  testId?: string;
+}) {
+  const compact = form !== 'detail';
+  const sqft = listing.sqft.toLocaleString('en-US');
+  return (
+    <div
+      className={`homes-item ${form}`}
+      style={{ '--hue': listing.hue, '--flight': `${FLIGHT_MS}ms` } as CSSProperties}
+      data-testid={testId}
+    >
+      <div className="homes-photo" />
+      <div className="homes-item-body">
+        <strong className="homes-price">{formatPrice(listing.price)}</strong>
+        {/* Both copies stay mounted and cross-fade; the hidden one is inert. */}
+        <div className="homes-copy homes-copy-compact" inert={!compact}>
+          <span className="ex-meta">
+            {listing.beds} bd · {listing.baths} ba · {sqft} sqft
+          </span>
+          <span>{listing.address}</span>
+          <span className="ex-meta">{listing.neighborhood}</span>
+        </div>
+        <div className="homes-copy homes-copy-detail" inert={compact}>
+          <p>
+            {listing.address}, {listing.neighborhood}
+          </p>
+          <p className="ex-meta">
+            {listing.beds} bedrooms · {listing.baths} bathrooms · {sqft} sqft
+          </p>
+          <p className="homes-blurb">
+            Bright and quiet, a short walk from the river path. Recently renovated kitchen, south
+            facing garden and off-street parking. Open house this Saturday from 10am.
+          </p>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -78,6 +174,7 @@ function HomesMap() {
   const state = homesMap.useFloatyState();
   const form = state?.form ?? 'split';
   const focus = state?.focus;
+  const resultsFrom: ResultsFrom = state?.resultsFrom ?? (form === 'full' ? 'map' : 'list');
   const { hovered } = useHover();
   const [view, setView] = useState<View>(HOME_VIEW);
   const [dragging, setDragging] = useState(false);
@@ -165,6 +262,7 @@ function HomesMap() {
           <Marker
             key={listing.id}
             listing={listing}
+            from={resultsFrom}
             active={listing.id === hovered || listing.id === focus}
           />
         ))}
@@ -196,10 +294,18 @@ function HomesMap() {
   );
 }
 
-function Marker({ listing, active }: { listing: Listing; active: boolean }) {
+function Marker({
+  listing,
+  from,
+  active,
+}: {
+  listing: Listing;
+  from: ResultsFrom;
+  active: boolean;
+}) {
   return (
     <Link
-      href={`/homes/${listing.id}`}
+      href={listingPath(listing.id, from)}
       className={`map-marker${active ? ' active' : ''}`}
       style={{ left: listing.x, top: listing.y }}
       draggable={false}
@@ -243,28 +349,51 @@ function MapArt() {
   );
 }
 
-export function MapAnchor({ form, focus }: MapAnchorState) {
-  return <homesMap.FloatyAnchor className={`map-anchor ${form}`} state={{ form, focus }} />;
+export function MapAnchor({ form, focus, resultsFrom }: MapAnchorState) {
+  return (
+    <homesMap.FloatyAnchor className={`map-anchor ${form}`} state={{ form, focus, resultsFrom }} />
+  );
 }
 
-export function ListingCard({ listing }: { listing: Listing }) {
+export function ListingCard({
+  listing,
+  form = 'card',
+}: {
+  listing: Listing;
+  form?: 'card' | 'strip';
+}) {
   const { setHovered } = useHover();
+  // Link wraps the anchor (under the floaty). Cards use pointer-events: none so
+  // wheel events reach the list; clicks still hit this link underneath.
   return (
     <Link
-      href={`/homes/${listing.id}`}
-      className="homes-card"
+      href={listingPath(listing.id, form === 'strip' ? 'map' : 'list')}
+      className="homes-card-link"
+      aria-label={listing.address}
       onMouseEnter={() => setHovered(listing.id)}
       onMouseLeave={() => setHovered(null)}
     >
-      <div className="homes-photo" style={{ '--hue': listing.hue } as CSSProperties} />
-      <div>
-        <strong>{formatPrice(listing.price)}</strong>
-        <span className="ex-meta">
-          {listing.beds} bd · {listing.baths} ba · {listing.sqft.toLocaleString('en-US')} sqft
-        </span>
-        <span>{listing.address}</span>
-        <span className="ex-meta">{listing.neighborhood}</span>
-      </div>
+      <FloatyAnchor
+        floatyId={listingFloatyId(listing.id)}
+        className={`homes-slot ${form}`}
+        state={{ form } satisfies ListingItemState}
+      />
     </Link>
+  );
+}
+
+export function ListingDetail({ listing }: { listing: Listing }) {
+  return (
+    <FloatyAnchor
+      floatyId={listingFloatyId(listing.id)}
+      className="homes-slot detail"
+      priority={1}
+      state={{ form: 'detail' } satisfies ListingItemState}
+    >
+      {/* Invisible copy so the empty slot sizes to the detail content. */}
+      <div className="homes-sizer" aria-hidden>
+        <ListingItemView listing={listing} form="detail" />
+      </div>
+    </FloatyAnchor>
   );
 }

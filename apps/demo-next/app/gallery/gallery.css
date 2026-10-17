@@ -51,11 +51,6 @@
   background: transparent;
 }
 
-/* Floating photos: rendered in the overlay layer, outside `.ex`. */
-[data-floaty]:has(> .gal-floaty.raised) {
-  z-index: 1;
-}
-
 .gal-card {
   position: relative;
   width: 100%;
@@ -79,6 +74,44 @@
     radial-gradient(ellipse at 85% 120%, hsl(var(--hue) 55% 20%) 0 45%, transparent 46%),
     radial-gradient(circle at 70% 30%, hsl(calc(var(--hue) + 40) 90% 88%) 0 7%, transparent 8%),
     linear-gradient(180deg, hsl(calc(var(--hue) + 180) 45% 78%), hsl(var(--hue) 70% 58%));
+}
+
+/* Sharper grain and highlights — readable once the card is modal/page sized. */
+.gal-art-detail {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 280ms ease;
+  background:
+    radial-gradient(circle at 22% 28%, hsl(0 0% 100% / 35%) 0 1.2%, transparent 1.8%),
+    radial-gradient(circle at 48% 18%, hsl(0 0% 100% / 22%) 0 0.8%, transparent 1.4%),
+    radial-gradient(circle at 78% 42%, hsl(calc(var(--hue) + 50) 90% 92% / 55%) 0 2%, transparent 3%),
+    radial-gradient(ellipse at 60% 70%, hsl(var(--hue) 40% 20% / 35%) 0 28%, transparent 42%),
+    repeating-linear-gradient(
+      -12deg,
+      transparent 0 3px,
+      hsl(0 0% 100% / 4%) 3px 4px
+    ),
+    repeating-linear-gradient(
+      78deg,
+      transparent 0 5px,
+      hsl(0 0% 0% / 5%) 5px 6px
+    );
+}
+
+.gal-card.modal .gal-art-detail,
+.gal-card.page .gal-art-detail {
+  opacity: 1;
+}
+
+.gal-card.page {
+  box-shadow: 0 8px 28px rgb(0 0 0 / 18%);
+}
+
+.gal-page-anchor {
+  width: 100%;
+  max-width: 960px;
 }
 
 .gal-hit {

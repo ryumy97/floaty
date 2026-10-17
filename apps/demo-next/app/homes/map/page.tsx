@@ -8,7 +8,7 @@ export default function HomesMapPage() {
       <ul className="homes-strip">
         {LISTINGS.map((listing) => (
           <li key={listing.id}>
-            <ListingCard listing={listing} />
+            <ListingCard listing={listing} form="strip" />
           </li>
         ))}
       </ul>

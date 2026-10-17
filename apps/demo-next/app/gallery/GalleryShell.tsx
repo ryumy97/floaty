@@ -29,13 +29,21 @@ function useGallery(): GalleryContextValue {
   return value;
 }
 
+/** Above sibling photo layers (default 1000) while open or flying back to the grid. */
+const SELECTED_Z = 1100;
+/** Closing photos stay above the grid (but under the newly opened one) until they land. */
+const CLOSING_Z = 1090;
+
 export function GalleryShell({ children, modal }: { children: ReactNode; modal: ReactNode }) {
   const pathname = usePathname();
-  const openId = /^\/gallery\/photo\/([^/]+)/.exec(pathname)?.[1] ?? null;
+  const openId = /^\/gallery\/(?:photo|view)\/([^/]+)/.exec(pathname)?.[1] ?? null;
   const [modalOpen, setModalOpen] = useState(false);
-  // Stays raised above the other photos until it has landed back in the grid.
-  const [raisedId, setRaisedId] = useState<string | null>(null);
-  if (openId && openId !== raisedId) setRaisedId(openId);
+  // Every photo that is open or still flying back stays raised; next/prev keeps
+  // the outgoing card above the grid while the incoming one takes the top slot.
+  const [raisedIds, setRaisedIds] = useState<string[]>([]);
+  if (openId && !raisedIds.includes(openId)) {
+    setRaisedIds((ids) => (ids.includes(openId) ? ids : [...ids, openId]));
+  }
   const router = useRouter();
 
   return (
@@ -50,8 +58,8 @@ export function GalleryShell({ children, modal }: { children: ReactNode; modal: 
       </div>
 
       {/*
-       * The overlay layer sits above every page element, so this backdrop can't cover the
-       * other floating photos: they dim themselves instead (see PhotoCard).
+       * Floaty layers sit above page UI, so this backdrop can't cover the other
+       * floating photos: they dim themselves instead (see PhotoCard).
        */}
       {/* biome-ignore lint/a11y/useKeyWithClickEvents lint/a11y/noStaticElementInteractions: Escape and the Close button close the modal from the keyboard */}
       <div
@@ -65,9 +73,14 @@ export function GalleryShell({ children, modal }: { children: ReactNode; modal: 
         <Floaty
           key={photo.id}
           floatyId={photoFloatyId(photo.id)}
-          className={`gal-floaty${photo.id === raisedId ? ' raised' : ''}`}
+          className="gal-floaty"
+          zIndex={
+            photo.id === openId ? SELECTED_Z : raisedIds.includes(photo.id) ? CLOSING_Z : undefined
+          }
           onTransitionEnd={() => {
-            if (photo.id !== openId) setRaisedId((id) => (id === photo.id ? null : id));
+            if (photo.id !== openId) {
+              setRaisedIds((ids) => ids.filter((id) => id !== photo.id));
+            }
           }}
         >
           <PhotoCard photo={photo} />
@@ -78,7 +91,12 @@ export function GalleryShell({ children, modal }: { children: ReactNode; modal: 
 }
 
 function Art({ photo }: { photo: Photo }) {
-  return <div className="gal-art" style={{ '--hue': photo.hue } as CSSProperties} />;
+  return (
+    <div className="gal-art" style={{ '--hue': photo.hue } as CSSProperties}>
+      {/* Extra layers only read clearly at modal/page size (see .gal-art-detail). */}
+      <div className="gal-art-detail" aria-hidden />
+    </div>
+  );
 }
 
 function PhotoCard({ photo }: { photo: Photo }) {
@@ -89,7 +107,9 @@ function PhotoCard({ photo }: { photo: Photo }) {
   const index = PHOTOS.indexOf(photo);
   const prev = PHOTOS[(index + PHOTOS.length - 1) % PHOTOS.length];
   const next = PHOTOS[(index + 1) % PHOTOS.length];
-  const href = `/gallery/photo/${photo.id}`;
+  const modalHref = `/gallery/photo/${photo.id}`;
+  /** Soft-nav detail (no intercept) so the floaty can fly from the modal. */
+  const pageHref = `/gallery/view/${photo.id}`;
 
   return (
     <div className={`gal-card ${view}`} data-testid={`photo-${photo.id}`}>
@@ -100,7 +120,12 @@ function PhotoCard({ photo }: { photo: Photo }) {
         </span>
       )}
       {view === 'grid' && (
-        <Link href={href} scroll={false} className="gal-hit" aria-label={`Open ${photo.title}`} />
+        <Link
+          href={modalHref}
+          scroll={false}
+          className="gal-hit"
+          aria-label={`Open ${photo.title}`}
+        />
       )}
       <div className="gal-dim" data-on={(modalOpen && view === 'grid') || undefined} />
 
@@ -140,10 +165,9 @@ function PhotoCard({ photo }: { photo: Photo }) {
         >
           →
         </Link>
-        {/* A full load skips the interception and renders the photo page. */}
-        <a href={href} className="gal-button">
+        <Link href={pageHref} scroll={false} className="gal-button">
           Open page
-        </a>
+        </Link>
         <button
           type="button"
           className="gal-button"
@@ -176,7 +200,10 @@ export function PhotoModal({ id }: { id: string }) {
 
   return (
     <div className="gal-modal" role="dialog" aria-label="Photo">
+      {/* Remount on id change so the previous photo releases the modal and flies
+          back to the grid while the next one flies up from its cell. */}
       <FloatyAnchor
+        key={id}
         floatyId={photoFloatyId(id)}
         className="gal-modal-anchor"
         priority={1}

@@ -18,8 +18,8 @@ export default async function PhotoPage({ params }: { params: Promise<{ id: stri
       <div className="gal-page-details">
         <h1 className="ex-title">{photo.title}</h1>
         <p className="ex-meta">
-          Taken by {photo.author} in {photo.place}. Open any photo from the gallery to see it in a
-          modal instead: this page only renders on a full page load of its URL.
+          Taken by {photo.author} in {photo.place}. A full load of this URL shows the page; client
+          navigation from the grid opens the modal instead.
         </p>
       </div>
     </div>

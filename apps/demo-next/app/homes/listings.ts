@@ -140,6 +140,29 @@ export function getListing(id: string): Listing | undefined {
   return LISTINGS.find((listing) => listing.id === id);
 }
 
+export function listingFloatyId(id: string) {
+  return `homes-listing-${id}`;
+}
+
+/** Where the detail page's "Back to results" should return. */
+export type ResultsFrom = 'list' | 'map';
+
+export function listingPath(id: string, from: ResultsFrom = 'list') {
+  return `/homes/${id}?from=${from}`;
+}
+
+export function resultsPath(from: string | string[] | undefined) {
+  const value = Array.isArray(from) ? from[0] : from;
+  return value === 'map' ? '/homes/map' : '/homes';
+}
+
+export function parseResultsFrom(from: string | string[] | undefined): ResultsFrom {
+  const value = Array.isArray(from) ? from[0] : from;
+  return value === 'map' ? 'map' : 'list';
+}
+
+export type ListingItemState = { form: 'card' | 'strip' | 'detail' };
+
 export function formatPrice(price: number, short = false): string {
   if (short) {
     return price >= 1_000_000
