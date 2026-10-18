@@ -70,7 +70,11 @@ framework-agnostic parts of `packages/react/src` move to a `@ryumy97/floaty-core
 2. Set `"version": "x.y.z"` in `packages/react/package.json` to match the branch.
 3. Open a PR to `main`. CI, E2E, and the release-branch version guard must pass.
 4. Merge the PR. After CI and E2E succeed on that `main` commit, `.github/workflows/release.yml`
-   creates GitHub Release `vX.Y.Z`, which triggers `.github/workflows/publish.yml` to publish to npm.
+   creates GitHub Release `vX.Y.Z`, then dispatches `.github/workflows/publish.yml` (a release
+   created with `GITHUB_TOKEN` does not fire the `release` event).
+
+npm must have a Trusted Publisher for this repo with workflow filename `publish.yml` and
+**npm publish** allowed. Without that, the publish job fails with `ENEEDAUTH`.
 
 Do not create the GitHub Release or bump the version outside a `release/x.y.z` PR unless you intend
 to publish manually via `publish.yml` workflow_dispatch.
