@@ -1,6 +1,6 @@
 {
   "name": "@ryumy97/floaty-react",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Render persistent React content on top of the screen that follows layout anchors across layout changes.",
   "license": "MIT",
   "author": "ryumy97",
@@ -9,7 +9,7 @@
     "url": "git+https://github.com/ryumy97/floaty.git",
     "directory": "packages/react"
   },
-  "homepage": "https://github.com/ryumy97/floaty/tree/main/packages/react#readme",
+  "homepage": "https://floaty.ryumy.com/",
   "bugs": {
     "url": "https://github.com/ryumy97/floaty/issues"
   },
