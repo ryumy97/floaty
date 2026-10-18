@@ -1,6 +1,6 @@
 'use client';
 
-import { Floaty, FloatyAnchor, useFloatyState } from '@floaty/react';
+import { Floaty, FloatyAnchor, useFloatyState } from '@ryumy97/floaty-react';
 import { type ReactNode, useEffect, useState } from 'react';
 import { BlobAnchor } from './blob';
 

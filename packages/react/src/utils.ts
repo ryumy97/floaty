@@ -10,6 +10,6 @@ export const useIsomorphicLayoutEffect =
 /** Logs a warning outside production builds. */
 export function warnDev(message: string) {
   if (typeof process !== 'undefined' && process.env.NODE_ENV !== 'production') {
-    console.warn(`[@floaty/react] ${message}`);
+    console.warn(`[@ryumy97/floaty-react] ${message}`);
   }
 }

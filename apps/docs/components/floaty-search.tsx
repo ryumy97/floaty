@@ -1,6 +1,6 @@
 'use client';
 
-import { createFloaty } from '@floaty/react';
+import { createFloaty } from '@ryumy97/floaty-react';
 import type { SortedResult } from 'fumadocs-core/search';
 import { useFetchSearch, useHighlightQuery } from 'fumadocs-core/search/client';
 import { type SharedProps, useSearchContext } from 'fumadocs-ui/contexts/search';

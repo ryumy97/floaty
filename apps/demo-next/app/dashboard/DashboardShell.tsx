@@ -1,6 +1,6 @@
 'use client';
 
-import { Floaty, FloatyAnchor, useFloatyState } from '@floaty/react';
+import { Floaty, FloatyAnchor, useFloatyState } from '@ryumy97/floaty-react';
 import Link from 'next/link';
 import { type CSSProperties, type ReactNode, useEffect, useState } from 'react';
 import { ExampleHeader } from '../ExampleHeader';

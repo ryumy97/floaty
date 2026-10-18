@@ -9,7 +9,7 @@ Floaty lets React component move between places in your layout without remountin
 ## Get Started
 
 ```bash
-pnpm add @floaty/react
+pnpm add @ryumy97/floaty-react
 ```
 
 - `<Floaty>` renders your content **once**, in a layer on top of the page. Put it in a
@@ -23,7 +23,7 @@ pnpm add @floaty/react
 This example describes an simple counter persisting and state between layout shift.
 
 ```jsx
-import { Floaty, FloatyAnchor } from '@floaty/react';
+import { Floaty, FloatyAnchor } from '@ryumy97/floaty-react';
 import { useState } from 'react';
 
 function Counter() {

@@ -1,6 +1,6 @@
 'use client';
 
-import { createFloaty } from '@floaty/react';
+import { createFloaty } from '@ryumy97/floaty-react';
 import type { ReactNode } from 'react';
 import { cn } from '@/lib/cn';
 

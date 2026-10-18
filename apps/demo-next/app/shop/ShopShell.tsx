@@ -1,6 +1,6 @@
 'use client';
 
-import { createFloaty } from '@floaty/react';
+import { createFloaty } from '@ryumy97/floaty-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {

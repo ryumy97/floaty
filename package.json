@@ -4,9 +4,9 @@
   "type": "module",
   "packageManager": "pnpm@10.0.0",
   "scripts": {
-    "dev": "turbo run dev --filter=@floaty/demo-vite...",
-    "dev:next": "turbo run dev --filter=@floaty/demo-next...",
-    "dev:docs": "turbo run dev --filter=@floaty/docs...",
+    "dev": "turbo run dev --filter=@ryumy97/floaty-demo-vite...",
+    "dev:next": "turbo run dev --filter=@ryumy97/floaty-demo-next...",
+    "dev:docs": "turbo run dev --filter=@ryumy97/floaty-docs...",
     "build": "turbo run build",
     "test": "turbo run test",
     "test:e2e": "turbo run test:e2e",

@@ -1,7 +1,7 @@
 'use client';
 
 // #region example
-import { Floaty, FloatyAnchor, useFloatyTransition } from '@floaty/react';
+import { Floaty, FloatyAnchor, useFloatyTransition } from '@ryumy97/floaty-react';
 import { useState } from 'react';
 
 type CounterState = { compact: boolean };

@@ -5,10 +5,10 @@ import { defineConfig, devices } from '@playwright/test';
  * playground, the Next.js demo has the multi-page examples.
  */
 const DEMOS = [
-  { name: 'vite', filter: '@floaty/demo-vite', port: 5199, testMatch: ['floaty.spec.ts'] },
+  { name: 'vite', filter: '@ryumy97/floaty-demo-vite', port: 5199, testMatch: ['floaty.spec.ts'] },
   {
     name: 'next',
-    filter: '@floaty/demo-next',
+    filter: '@ryumy97/floaty-demo-next',
     port: 5200,
     testMatch: ['navigation.spec.ts', 'examples.spec.ts'],
   },

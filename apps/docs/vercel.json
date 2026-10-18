@@ -1,6 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
-  "installCommand": "cd ../.. && pnpm install --filter @floaty/docs...",
-  "buildCommand": "cd ../.. && pnpm exec turbo run build --filter=@floaty/docs"
+  "installCommand": "cd ../.. && pnpm install --filter @ryumy97/floaty-docs...",
+  "buildCommand": "cd ../.. && pnpm exec turbo run build --filter=@ryumy97/floaty-docs"
 }

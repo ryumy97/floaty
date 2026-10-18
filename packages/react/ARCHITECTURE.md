@@ -1,4 +1,4 @@
-# @floaty/react: Architecture
+# @ryumy97/floaty-react: Architecture
 
 | | |
 | --- | --- |
@@ -860,7 +860,7 @@ Coverage by behavior:
 - rAF fallback (`tests/fallback.test.ts`): per-frame gap styles for easing and springs,
   resting styles restored on finish and cancel, no `onFinish` after cancel.
 
-**End-to-end (`e2e/`, Playwright, Chromium).** Each demo app imports `@floaty/react`
+**End-to-end (`e2e/`, Playwright, Chromium).** Each demo app imports `@ryumy97/floaty-react`
 itself and is a Playwright project running its own specs: `vite` (`apps/demo-vite`, port
 5199, the one-page playground, `floaty.spec.ts`) and `next` (`apps/demo-next`, Next.js App
 Router, port 5200, multi-page examples, `navigation.spec.ts` and `examples.spec.ts`).

@@ -1,6 +1,6 @@
 'use client';
 
-import { Floaty, FloatyAnchor, type FloatyTransition } from '@floaty/react';
+import { Floaty, FloatyAnchor, type FloatyTransition } from '@ryumy97/floaty-react';
 import { type PointerEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import {
   type Bezier,

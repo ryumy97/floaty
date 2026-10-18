@@ -1,5 +1,5 @@
 {
-  "name": "@floaty/docs",
+  "name": "@ryumy97/floaty-docs",
   "private": true,
   "type": "module",
   "scripts": {
@@ -9,7 +9,7 @@
     "typecheck": "next typegen && tsc --noEmit"
   },
   "dependencies": {
-    "@floaty/react": "workspace:*",
+    "@ryumy97/floaty-react": "workspace:*",
     "cn": "^0.4.0",
     "fumadocs-core": "16.17.2",
     "fumadocs-mdx": "15.4.7",

@@ -1,5 +1,5 @@
 {
-  "name": "@floaty/e2e",
+  "name": "@ryumy97/floaty-e2e",
   "private": true,
   "type": "module",
   "scripts": {
@@ -7,8 +7,8 @@
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
-    "@floaty/demo-next": "workspace:*",
-    "@floaty/demo-vite": "workspace:*",
+    "@ryumy97/floaty-demo-next": "workspace:*",
+    "@ryumy97/floaty-demo-vite": "workspace:*",
     "@playwright/test": "^1.63.0",
     "@types/node": "catalog:",
     "typescript": "catalog:"

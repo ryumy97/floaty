@@ -6,7 +6,7 @@ import {
   useFloaty,
   useFloatyState,
   useFloatyTransition,
-} from '@floaty/react';
+} from '@ryumy97/floaty-react';
 import { useEffect, useState } from 'react';
 
 configureFloaty({ transition: { easing: 'cubic-bezier(0.22, 1, 0.36, 1)' } });

@@ -1,5 +1,5 @@
 {
-  "name": "@floaty/demo-vite",
+  "name": "@ryumy97/floaty-demo-vite",
   "private": true,
   "type": "module",
   "scripts": {
@@ -9,7 +9,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@floaty/react": "workspace:*",
+    "@ryumy97/floaty-react": "workspace:*",
     "react": "catalog:",
     "react-dom": "catalog:"
   },

@@ -21,7 +21,7 @@ workspace dependencies first (`^build`) and caches results.
 | Typecheck everything | `pnpm typecheck` |
 | Lint, format and sort imports ([Biome](https://biomejs.dev), `biome.json`) | `pnpm lint` (`pnpm lint:fix` writes fixes) |
 | Build everything | `pnpm build` |
-| One package only | `pnpm --filter @floaty/react test` (or `turbo run test --filter=...`) |
+| One package only | `pnpm --filter @ryumy97/floaty-react test` (or `turbo run test --filter=...`) |
 
 Shared versions (`react`, `typescript`, `vite`, `next`, ...) live in the `catalog:` of
 `pnpm-workspace.yaml`; reference them with `"catalog:"` in package manifests.
@@ -33,11 +33,11 @@ runs from the root over the whole repo (no Turborepo task); suppress a rule inli
 `// biome-ignore <rule>: <reason>` comment only when the code is right as written.
 
 When changing positioning, animation or tracking in `packages/react/src/`, or the demos,
-also run `pnpm test:e2e` (first time: `pnpm --filter @floaty/e2e exec playwright install chromium`).
+also run `pnpm test:e2e` (first time: `pnpm --filter @ryumy97/floaty-e2e exec playwright install chromium`).
 
 ## Project layout
 
-- `packages/react/` (`@floaty/react`, published): the library. Read
+- `packages/react/` (`@ryumy97/floaty-react`, published): the library. Read
   `packages/react/ARCHITECTURE.md` before changing `src/`, in particular the commit-phase
   timing invariant (section 9), and keep it up to date when the design changes.
   - `src/`: `Floaty`, `FloatyAnchor`, hooks, `createFloaty`, `configureFloaty`, backed by a
@@ -46,7 +46,7 @@ also run `pnpm test:e2e` (first time: `pnpm --filter @floaty/e2e exec playwright
     `data-rect` and mocks `element.animate`.
   - Keep `react`, `react-dom`, and `zustand` external and the `'use client'` banner in the
     build (`vite.config.ts`).
-- `apps/demo-vite/`, `apps/demo-next/` (private): both import `@floaty/react` directly,
+- `apps/demo-vite/`, `apps/demo-next/` (private): both import `@ryumy97/floaty-react` directly,
   through its built `dist/`, like a real app.
   - `apps/demo-vite/`: the one-page playground (`App.tsx`, `styles.css`), covered by
     `e2e/floaty.spec.ts`, which relies on its layouts and controls.
@@ -61,8 +61,8 @@ also run `pnpm test:e2e` (first time: `pnpm --filter @floaty/e2e exec playwright
 - `e2e/` (private): Playwright specs, run as the `vite` and `next` projects, each matching
   its demo's specs (`e2e/playwright.config.ts`). Tests fail on page errors and `console.error`.
 
-Future framework packages (`@floaty/vue`, `@floaty/svelte`) go in `packages/`, after the
-framework-agnostic parts of `packages/react/src` move to a `@floaty/core` package.
+Future framework packages (`@ryumy97/floaty-vue`, `@ryumy97/floaty-svelte`) go in `packages/`, after the
+framework-agnostic parts of `packages/react/src` move to a `@ryumy97/floaty-core` package.
 
 <!-- BEGIN:turborepo-agent-rules -->
 

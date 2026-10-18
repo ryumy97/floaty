@@ -1,6 +1,6 @@
 'use client';
 
-import { createFloaty } from '@floaty/react';
+import { createFloaty } from '@ryumy97/floaty-react';
 import { type FormEvent, useState } from 'react';
 import { useChatOpen } from './open';
 

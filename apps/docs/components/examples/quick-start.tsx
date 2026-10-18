@@ -1,7 +1,7 @@
 'use client';
 
 // #region example
-import { Floaty, FloatyAnchor } from '@floaty/react';
+import { Floaty, FloatyAnchor } from '@ryumy97/floaty-react';
 import { useState } from 'react';
 
 function Counter() {

@@ -50,7 +50,7 @@ importers:
 
   apps/demo-next:
     dependencies:
-      '@floaty/react':
+      '@ryumy97/floaty-react':
         specifier: workspace:*
         version: link:../../packages/react
       next:
@@ -78,7 +78,7 @@ importers:
 
   apps/demo-vite:
     dependencies:
-      '@floaty/react':
+      '@ryumy97/floaty-react':
         specifier: workspace:*
         version: link:../../packages/react
       react:
@@ -106,7 +106,7 @@ importers:
 
   apps/docs:
     dependencies:
-      '@floaty/react':
+      '@ryumy97/floaty-react':
         specifier: workspace:*
         version: link:../../packages/react
       cn:
@@ -161,15 +161,15 @@ importers:
 
   e2e:
     devDependencies:
-      '@floaty/demo-next':
-        specifier: workspace:*
-        version: link:../apps/demo-next
-      '@floaty/demo-vite':
-        specifier: workspace:*
-        version: link:../apps/demo-vite
       '@playwright/test':
         specifier: ^1.63.0
         version: 1.63.0
+      '@ryumy97/floaty-demo-next':
+        specifier: workspace:*
+        version: link:../apps/demo-next
+      '@ryumy97/floaty-demo-vite':
+        specifier: workspace:*
+        version: link:../apps/demo-vite
       '@types/node':
         specifier: 'catalog:'
         version: 26.6.4
