@@ -198,3 +198,52 @@ jobs:
             --title "v${VERSION}" \
             --generate-notes \
             --target "${{ github.sha }}"
+
+  # GITHUB_TOKEN-created releases do not trigger publish.yml's `release` event.
+  # workflow_dispatch does work from GITHUB_TOKEN, and keeps OIDC identity as
+  # publish.yml (the trusted publisher configured on npmjs.com).
+  publish:
+    name: Publish to npm
+    needs: [detect, create-release]
+    if: needs.detect.outputs.should_release == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      actions: write
+      contents: read
+
+    steps:
+      - name: Dispatch publish.yml and wait
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.detect.outputs.version }}
+        run: |
+          set -euo pipefail
+          gh workflow run "Publish @ryumy97/floaty-react" \
+            --repo "${{ github.repository }}" \
+            --ref "v${VERSION}" \
+            -f dry_run=false
+
+          # Resolve the run we just created (may take a moment to appear).
+          run_id=""
+          for _ in $(seq 1 30); do
+            run_id="$(gh run list \
+              --repo "${{ github.repository }}" \
+              --workflow "Publish @ryumy97/floaty-react" \
+              --event workflow_dispatch \
+              --limit 5 \
+              --json databaseId,headSha,status,createdAt \
+              --jq "[.[] | select(.headSha == \"${{ github.sha }}\")] | first | .databaseId // empty")"
+            if [[ -n "$run_id" ]]; then
+              break
+            fi
+            sleep 2
+          done
+
+          if [[ -z "$run_id" ]]; then
+            echo "Could not find the dispatched publish run."
+            exit 1
+          fi
+
+          echo "Watching publish run $run_id"
+          gh run watch "$run_id" --repo "${{ github.repository }}" --exit-status
