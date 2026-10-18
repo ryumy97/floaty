@@ -1,6 +1,6 @@
 {
   "name": "@ryumy97/floaty-react",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Render persistent React content on top of the screen that follows layout anchors across layout changes.",
   "license": "MIT",
   "author": "ryumy97",
