@@ -2,6 +2,7 @@
   "name": "floaty",
   "private": true,
   "type": "module",
+  "homepage": "https://floaty.ryumy.com/",
   "packageManager": "pnpm@10.0.0",
   "scripts": {
     "dev": "turbo run dev --filter=@ryumy97/floaty-demo-vite...",

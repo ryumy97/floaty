@@ -64,12 +64,11 @@ export default function App() {
 }
 ```
 
-For more examples visit 
-<!-- Link here -->
+For more examples visit [floaty.ryumy.com/examples](https://floaty.ryumy.com/examples).
 
 ## Documentation
 
-<!-- TODO: url here -->
+[floaty.ryumy.com/docs](https://floaty.ryumy.com/docs)
 
 ## License
 
