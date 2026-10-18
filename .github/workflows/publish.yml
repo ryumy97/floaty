@@ -13,12 +13,12 @@ on:
         type: boolean
         default: false
 
-# OIDC trusted publishing — no NPM_TOKEN. Configure on npmjs.com:
-# Package → Settings → Trusted Publisher → GitHub Actions
+# OIDC trusted publishing — no NPM_TOKEN. Match npmjs.com Trusted Publisher:
 #   Organization or user: ryumy97
 #   Repository: floaty
 #   Workflow filename: publish.yml
-#   Allowed actions: include "npm publish" (not only staged publish)
+#   Environment: NPM_PUBLISH_VARS
+#   Allowed actions: npm stage publish
 permissions:
   contents: read
   id-token: write
@@ -28,6 +28,8 @@ jobs:
     name: Publish to npm
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # Must match the Environment name on the npm Trusted Publisher.
+    environment: NPM_PUBLISH_VARS
 
     steps:
       - name: Checkout
@@ -37,7 +39,7 @@ jobs:
         uses: pnpm/action-setup@v4
 
       # Do not set registry-url here: setup-node would write an empty
-      # _authToken into .npmrc, which makes pnpm skip the OIDC exchange.
+      # _authToken into .npmrc, which makes OIDC skip the token exchange.
       # See https://github.com/actions/setup-node/issues/1551
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -45,10 +47,17 @@ jobs:
           node-version: 22.14
           cache: pnpm
 
-      # pnpm publish delegates to `npm publish`. OIDC needs npm >= 11.5.1;
-      # Node 22 ships npm 10.x. Pin npm 11 (not 12+) so --no-git-checks still works.
-      - name: Pin npm 11 for OIDC trusted publishing
-        run: npm install -g npm@11
+      # Trusted publishing needs npm >= 11.5.1; staged publish needs >= 11.15.
+      # pnpm 10's `pnpm publish` does not perform OIDC — use npm directly.
+      # See https://github.com/pnpm/pnpm/issues/11513
+      - name: Pin npm for OIDC trusted publishing
+        run: |
+          npm install -g npm@11.15.0
+          npm --version
+          test -n "${ACTIONS_ID_TOKEN_REQUEST_URL:-}" || {
+            echo "ACTIONS_ID_TOKEN_REQUEST_URL is unset; id-token: write is required."
+            exit 1
+          }
 
       - name: Install
         run: pnpm install --frozen-lockfile
@@ -59,13 +68,14 @@ jobs:
       - name: Build
         run: pnpm --filter @ryumy97/floaty-react build
 
-      - name: Publish (dry run)
+      - name: Stage publish (dry run)
         if: ${{ inputs.dry_run == true }}
         working-directory: packages/react
-        run: pnpm publish --dry-run --no-git-checks --access public
+        run: npm stage publish --dry-run --access public
 
-      - name: Publish
+      - name: Stage publish
         if: ${{ inputs.dry_run != true }}
         working-directory: packages/react
-        # Provenance is automatic with trusted publishing; no NPM_TOKEN.
-        run: pnpm publish --no-git-checks --access public
+        # Trusted publisher allows stage only. Approve on npmjs.com (Staged
+        # Packages) or `npm stage approve <id>` with 2FA to go live.
+        run: npm stage publish --access public

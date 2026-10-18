@@ -73,8 +73,15 @@ framework-agnostic parts of `packages/react/src` move to a `@ryumy97/floaty-core
    creates GitHub Release `vX.Y.Z`, then dispatches `.github/workflows/publish.yml` (a release
    created with `GITHUB_TOKEN` does not fire the `release` event).
 
-npm must have a Trusted Publisher for this repo with workflow filename `publish.yml` and
-**npm publish** allowed. Without that, the publish job fails with `ENEEDAUTH`.
+npm Trusted Publisher must match the workflow exactly:
+- Workflow filename: `publish.yml`
+- Environment: `NPM_PUBLISH_VARS` (GitHub Actions environment of the same name)
+- Allowed action: `npm stage publish`
+
+The job runs `npm stage publish` (not `pnpm publish` — pnpm 10 skips OIDC). After CI
+stages a version, approve it on npmjs.com → Staged Packages (or `npm stage approve`) with
+2FA before it goes live. The first successful stage also validates the pending trusted
+publisher config (must happen before its expiry).
 
 Do not create the GitHub Release or bump the version outside a `release/x.y.z` PR unless you intend
 to publish manually via `publish.yml` workflow_dispatch.
