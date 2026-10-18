@@ -86,18 +86,14 @@
   background:
     radial-gradient(circle at 22% 28%, hsl(0 0% 100% / 35%) 0 1.2%, transparent 1.8%),
     radial-gradient(circle at 48% 18%, hsl(0 0% 100% / 22%) 0 0.8%, transparent 1.4%),
-    radial-gradient(circle at 78% 42%, hsl(calc(var(--hue) + 50) 90% 92% / 55%) 0 2%, transparent 3%),
-    radial-gradient(ellipse at 60% 70%, hsl(var(--hue) 40% 20% / 35%) 0 28%, transparent 42%),
-    repeating-linear-gradient(
-      -12deg,
-      transparent 0 3px,
-      hsl(0 0% 100% / 4%) 3px 4px
+    radial-gradient(
+      circle at 78% 42%,
+      hsl(calc(var(--hue) + 50) 90% 92% / 55%) 0 2%,
+      transparent 3%
     ),
-    repeating-linear-gradient(
-      78deg,
-      transparent 0 5px,
-      hsl(0 0% 0% / 5%) 5px 6px
-    );
+    radial-gradient(ellipse at 60% 70%, hsl(var(--hue) 40% 20% / 35%) 0 28%, transparent 42%),
+    repeating-linear-gradient(-12deg, transparent 0 3px, hsl(0 0% 100% / 4%) 3px 4px),
+    repeating-linear-gradient(78deg, transparent 0 5px, hsl(0 0% 0% / 5%) 5px 6px);
 }
 
 .gal-card.modal .gal-art-detail,
