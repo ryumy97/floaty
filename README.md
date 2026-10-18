@@ -70,6 +70,12 @@ For more examples visit [floaty.ryumy.com/examples](https://floaty.ryumy.com/exa
 
 [floaty.ryumy.com/docs](https://floaty.ryumy.com/docs)
 
+## Releasing
+
+Publish `@ryumy97/floaty-react` by opening a `release/x.y.z` PR that bumps
+`packages/react/package.json`, then merging to `main`. After CI and E2E pass, a GitHub
+Release is created and the package is published to npm. See [AGENTS.md](AGENTS.md#releasing-ryumy97floaty-react).
+
 ## License
 
 MIT

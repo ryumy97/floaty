@@ -1,0 +1,200 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  # Per-SHA on main so a later push does not cancel an in-flight release wait.
+  group: release-${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  actions: read
+  contents: read
+  pull-requests: read
+
+jobs:
+  # Fail release/* PRs early if package.json version does not match the branch.
+  guard:
+    name: Guard release branch version
+    if: github.event_name == 'pull_request' && startsWith(github.head_ref, 'release/')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Assert package version matches release branch
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$HEAD_REF" =~ ^release/([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
+            echo "Branch '$HEAD_REF' must be release/x.y.z (semver)."
+            exit 1
+          fi
+          expected="${BASH_REMATCH[1]}"
+          actual="$(node -p "require('./packages/react/package.json').version")"
+          if [[ "$actual" != "$expected" ]]; then
+            echo "packages/react/package.json version is '$actual' but branch expects '$expected'."
+            exit 1
+          fi
+          echo "Version $actual matches branch $HEAD_REF."
+
+  detect:
+    name: Detect release merge
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      should_release: ${{ steps.detect.outputs.should_release }}
+      version: ${{ steps.detect.outputs.version }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Detect release/* PR for this commit
+        id: detect
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          echo "should_release=false" >> "$GITHUB_OUTPUT"
+          echo "version=" >> "$GITHUB_OUTPUT"
+
+          pulls="$(gh api \
+            "repos/${{ github.repository }}/commits/${{ github.sha }}/pulls" \
+            --jq 'map({number, headRefName: .head.ref, merged: .merged_at})')"
+
+          count="$(echo "$pulls" | jq 'length')"
+          if [[ "$count" -eq 0 ]]; then
+            echo "No PR associated with this commit; skipping release."
+            exit 0
+          fi
+
+          head_ref="$(echo "$pulls" | jq -r '.[0].headRefName')"
+          echo "Associated PR head ref: $head_ref"
+
+          if [[ ! "$head_ref" =~ ^release/([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
+            echo "Not a release/* branch; skipping release."
+            exit 0
+          fi
+
+          version="${BASH_REMATCH[1]}"
+          actual="$(node -p "require('./packages/react/package.json').version")"
+          if [[ "$actual" != "$version" ]]; then
+            echo "packages/react/package.json version is '$actual' but release branch expects '$version'."
+            exit 1
+          fi
+
+          if gh api "repos/${{ github.repository }}/git/ref/tags/v${version}" >/dev/null 2>&1; then
+            echo "Tag v${version} already exists; refusing to create another release."
+            exit 1
+          fi
+
+          echo "should_release=true" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Will release v${version}."
+
+  wait:
+    name: Wait for CI and E2E
+    needs: detect
+    if: needs.detect.outputs.should_release == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+
+    steps:
+      - name: Wait for CI and E2E workflows on this SHA
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ github.sha }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          required=("CI" "E2E")
+          deadline=$((SECONDS + 35 * 60))
+
+          status_for() {
+            local name="$1"
+            gh run list \
+              --repo "$REPO" \
+              --commit "$SHA" \
+              --workflow "$name" \
+              --limit 5 \
+              --json databaseId,status,conclusion,name \
+              --jq "[.[] | select(.name == \"$name\")] | first | {status, conclusion}"
+          }
+
+          while true; do
+            all_ok=true
+            any_failed=false
+
+            for name in "${required[@]}"; do
+              info="$(status_for "$name")"
+              if [[ -z "$info" || "$info" == "null" ]]; then
+                echo "Waiting for workflow '$name' to appear..."
+                all_ok=false
+                continue
+              fi
+
+              status="$(echo "$info" | jq -r '.status')"
+              conclusion="$(echo "$info" | jq -r '.conclusion // empty')"
+              echo "$name: status=$status conclusion=${conclusion:-none}"
+
+              if [[ "$status" != "completed" ]]; then
+                all_ok=false
+                continue
+              fi
+
+              if [[ "$conclusion" != "success" ]]; then
+                echo "Workflow '$name' finished with conclusion '$conclusion'."
+                any_failed=true
+              fi
+            done
+
+            if [[ "$any_failed" == true ]]; then
+              exit 1
+            fi
+
+            if [[ "$all_ok" == true ]]; then
+              echo "CI and E2E succeeded for $SHA."
+              exit 0
+            fi
+
+            if (( SECONDS >= deadline )); then
+              echo "Timed out waiting for CI and E2E."
+              exit 1
+            fi
+
+            sleep 30
+          done
+
+  create-release:
+    name: Create GitHub Release
+    needs: [detect, wait]
+    if: needs.detect.outputs.should_release == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      pull-requests: read
+
+    steps:
+      - name: Create release v${{ needs.detect.outputs.version }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.detect.outputs.version }}
+        run: |
+          set -euo pipefail
+          gh release create "v${VERSION}" \
+            --repo "${{ github.repository }}" \
+            --title "v${VERSION}" \
+            --generate-notes \
+            --target "${{ github.sha }}"

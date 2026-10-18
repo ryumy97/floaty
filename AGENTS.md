@@ -64,6 +64,17 @@ also run `pnpm test:e2e` (first time: `pnpm --filter @ryumy97/floaty-e2e exec pl
 Future framework packages (`@ryumy97/floaty-vue`, `@ryumy97/floaty-svelte`) go in `packages/`, after the
 framework-agnostic parts of `packages/react/src` move to a `@ryumy97/floaty-core` package.
 
+## Releasing `@ryumy97/floaty-react`
+
+1. Branch `release/x.y.z` from `main` (e.g. `release/0.1.1`).
+2. Set `"version": "x.y.z"` in `packages/react/package.json` to match the branch.
+3. Open a PR to `main`. CI, E2E, and the release-branch version guard must pass.
+4. Merge the PR. After CI and E2E succeed on that `main` commit, `.github/workflows/release.yml`
+   creates GitHub Release `vX.Y.Z`, which triggers `.github/workflows/publish.yml` to publish to npm.
+
+Do not create the GitHub Release or bump the version outside a `release/x.y.z` PR unless you intend
+to publish manually via `publish.yml` workflow_dispatch.
+
 <!-- BEGIN:turborepo-agent-rules -->
 
 # This is NOT the Turborepo you know
